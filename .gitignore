@@ -1,0 +1,110 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+/build/
+develop-eggs/
+/dist/
+downloads/
+eggs/
+.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environments & Virtualenv
+venv/
+.venv/
+env/
+ENV/
+backend/venv/
+backend/.venv/
+
+# Testing & Coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+test_rec/
+
+# Environment Variables & Secrets
+.env
+.env.*
+*.env
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+construction_os.db
+backend/construction_os.db
+
+# Frontend / Next.js / Node
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+.pnp
+.pnp.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.vercel
+*.tsbuildinfo
+
+# Internal Planning, Ideation & Discovery Docs
+*.docx
+*.doc
+project_idea.md
+implementation_plan.md
+PROJECT.md
+PROJECT.docx
+WHAT_HAS_BEEN_BUILT.*
+TEST_INFRA.*
+HOW_TO_USE_GUIDE.*
+ORIGINAL_REQUEST.md
+generate_*.py
+convert_md_to_docx.py
+questions.docx
+AI_Construction_OS_Critical_Questions.docx
+Client_Discovery_Answers.docx
+
+# Temporary Files / Lock Files
+~$*.docx
+~$*.xlsx
+~$*.pptx
+*.tmp
+
+# Agent Run Artifacts
+.agents/
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
