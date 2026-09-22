@@ -21,7 +21,9 @@ class EmailService:
         
     def _is_configured(self) -> bool:
         """Check if real SMTP config is set."""
-        if not settings.SMTP_PASSWORD or settings.SMTP_PASSWORD == 'test':
+        if not settings.SMTP_PASSWORD or settings.SMTP_PASSWORD in ('test', 'secret', 'test-password', 'fake_password', ''):
+            return False
+        if not settings.SMTP_HOST or settings.SMTP_HOST.endswith(".test") or settings.SMTP_HOST in ("smtp.test", "localhost", "127.0.0.1"):
             return False
         return True
 
