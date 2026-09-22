@@ -108,3 +108,10 @@ Client_Discovery_Answers.docx
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# SSH and SSL Keys
+*.pem
+*.key
+*.pub
+id_rsa*
+

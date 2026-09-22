@@ -23,6 +23,15 @@ interface AlertItem {
   category?: string;
 }
 
+interface RawAlert {
+  severity?: 'WARNING' | 'CRITICAL' | 'INFO';
+  title?: string;
+  type?: string;
+  description?: string;
+  message?: string;
+  category?: string;
+}
+
 export default function ExecutiveBriefPage() {
   const [operationalDate, setOperationalDate] = useState(() => {
     return new Date().toISOString().split('T')[0];
@@ -76,7 +85,7 @@ export default function ExecutiveBriefPage() {
           setPettyCashSpend(summary.petty_cash_spent ?? 5500);
         }
         if (res.data.alerts && res.data.alerts.length > 0) {
-          const mappedAlerts = res.data.alerts.map((a: any) => ({
+          const mappedAlerts = res.data.alerts.map((a: RawAlert) => ({
             severity: a.severity || 'WARNING',
             title: a.title || (a.type ? a.type.replace(/_/g, ' ') : 'Operational Exception'),
             description: a.description || a.message || 'Operational exception noted during shift aggregation.',
@@ -114,7 +123,7 @@ export default function ExecutiveBriefPage() {
           setPettyCashSpend(summary.petty_cash_spent ?? 5500);
         }
         if (res.data.alerts && res.data.alerts.length > 0) {
-          const mappedAlerts = res.data.alerts.map((a: any) => ({
+          const mappedAlerts = res.data.alerts.map((a: RawAlert) => ({
             severity: a.severity || 'WARNING',
             title: a.title || (a.type ? a.type.replace(/_/g, ' ') : 'Operational Exception'),
             description: a.description || a.message || 'Operational exception noted during shift aggregation.',

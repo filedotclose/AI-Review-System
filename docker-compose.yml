@@ -6,27 +6,32 @@ services:
     container_name: construction_os_postgres
     restart: always
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: construction_os
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-construction_os}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d construction_os"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-construction_os}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - app_network
 
   redis:
     image: redis:7-alpine
     container_name: construction_os_redis
     restart: always
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
 
   minio:
     image: minio/minio:latest
@@ -34,11 +39,8 @@ services:
     restart: always
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: password123
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-password123}
     volumes:
       - minio_data:/data
     healthcheck:
@@ -46,8 +48,90 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
+    networks:
+      - app_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: construction_os_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-construction_os}
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-admin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-password123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-construction-os}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-odipks-secret-key-2026-production-change-me}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 15
+      JWT_REFRESH_TOKEN_EXPIRE_DAYS: 7
+      WHATSAPP_API_URL: ${WHATSAPP_API_URL:-https://graph.facebook.com/v18.0/}
+      WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN:-fake_token}
+      WHATSAPP_OWNER_PHONE: ${WHATSAPP_OWNER_PHONE:-+910000000000}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-fake_sid}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-fake_token}
+      TWILIO_WHATSAPP_NUMBER: ${TWILIO_WHATSAPP_NUMBER:-+14155238886}
+      USE_TWILIO_FALLBACK: "True"
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: 587
+      SMTP_USER: ${SMTP_USER:-test@gmail.com}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-test}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-test@gmail.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: construction_os_celery
+    restart: always
+    command: celery -A app.tasks.celery_app.celery_app worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-construction_os}
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-admin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-password123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-construction-os}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-odipks-secret-key-2026-production-change-me}
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - app_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: construction_os_frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - backend
+    networks:
+      - app_network
 
 volumes:
   postgres_data:
   redis_data:
   minio_data:
+
+networks:
+  app_network:
+    driver: bridge

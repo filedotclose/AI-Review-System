@@ -24,6 +24,16 @@ export function isOfflineQueued(error: unknown): boolean {
   );
 }
 
+export const getApiBaseUrl = (): string => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    return `http://${window.location.hostname}:8000/api/v1`;
+  }
+  return 'http://localhost:8000/api/v1';
+};
+
 const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
   headers: {
@@ -33,6 +43,10 @@ const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+  if (typeof window !== 'undefined' && !process.env.NEXT_PUBLIC_API_URL) {
+    config.baseURL = getApiBaseUrl();
+  }
+
   // Check if browser is strictly offline
   if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && !navigator.onLine) {
     if (config.method && config.method.toLowerCase() !== 'get') {
