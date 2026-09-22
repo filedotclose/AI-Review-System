@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -79,6 +79,7 @@ yarn-error.log*
 *.tsbuildinfo
 
 # Internal Planning, Ideation & Discovery Docs
+local_artifacts/
 *.docx
 *.doc
 project_idea.md
@@ -94,6 +95,13 @@ convert_md_to_docx.py
 questions.docx
 AI_Construction_OS_Critical_Questions.docx
 Client_Discovery_Answers.docx
+
+# Media & Video Recordings
+*.mp4
+*.webm
+*.mov
+*.avi
+*.mkv
 
 # Temporary Files / Lock Files
 ~$*.docx
