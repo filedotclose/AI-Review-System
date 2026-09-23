@@ -95,6 +95,19 @@ apiClient.interceptors.response.use(
       return Promise.reject(offlineErr);
     }
 
+    // If session expired or unauthorized on protected routes
+    if (typeof window !== 'undefined' && error.response?.status === 401) {
+      const url = error.config?.url || '';
+      if (!url.includes('/auth/pin-login') && !url.includes('/auth/email-login') && !url.includes('/auth/login')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login?reason=session_expired';
+        }
+      }
+    }
+
     return Promise.reject(error);
   }
 );

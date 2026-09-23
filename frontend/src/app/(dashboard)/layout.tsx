@@ -1,8 +1,42 @@
+'use client';
+
+import React, { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
 import { SyncStatusBadge } from '@/components/ui/SyncStatusBadge';
-import { FileText, Wallet, Users, LayoutDashboard, HardHat } from 'lucide-react';
+import { FileText, Wallet, Users, LayoutDashboard, HardHat, LogOut, ShieldCheck, User } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isLoading, isAuthenticated, router]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+            <HardHat className="h-6 w-6 animate-pulse" />
+          </div>
+          <p className="text-sm font-semibold text-gray-700">Verifying session...</p>
+          <div className="h-1.5 w-32 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-indigo-600 rounded-full animate-pulse w-1/2"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null; // Route redirect in progress
+  }
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Desktop Sidebar */}
@@ -55,6 +89,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               Attendance & Labour
             </Link>
           </nav>
+
+          {/* Active User Session & Logout in Desktop Sidebar */}
+          <div className="border-t border-gray-200 p-3 bg-gray-50/70">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
+                <User className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-bold text-gray-900 truncate">
+                  {user?.name || 'Logged In User'}
+                </div>
+                <div className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 truncate uppercase">
+                  <ShieldCheck className="h-3 w-3 inline text-indigo-500" />
+                  {user?.role?.replace('_', ' ') || 'ENGINEER'}
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                title="End device session (Sign Out)"
+                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -75,6 +134,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <div className="flex items-center gap-3">
             <SyncStatusBadge />
+            
+            {/* Header User details & Logout Button */}
+            {user && (
+              <div className="hidden sm:flex items-center gap-2.5 pl-3 border-l border-gray-200">
+                <div className="text-right">
+                  <div className="text-xs font-semibold text-gray-900">{user.name}</div>
+                  <div className="text-[10px] text-gray-500">{user.phone || user.email}</div>
+                </div>
+                <button
+                  onClick={logout}
+                  title="Sign Out from this device"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors border border-gray-200 cursor-pointer"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            )}
+
+            {/* Mobile Logout Button */}
+            <button
+              onClick={logout}
+              title="Sign Out from this device"
+              className="sm:hidden p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md cursor-pointer"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </header>
 
