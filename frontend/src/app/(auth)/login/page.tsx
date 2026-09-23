@@ -230,18 +230,7 @@ export default function LoginPage() {
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
-            <HardHat className="h-6 w-6 animate-pulse" />
-          </div>
-          <p className="text-xs text-gray-500 font-medium">Checking device authorization...</p>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
