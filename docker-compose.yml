@@ -1,4 +1,4 @@
-﻿version: '3.8'
+version: '3.8'
 
 services:
   postgres:
@@ -59,6 +59,8 @@ services:
     restart: always
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-construction_os}
       REDIS_URL: redis://redis:6379/0
@@ -96,6 +98,8 @@ services:
     container_name: construction_os_celery
     restart: always
     command: celery -A app.tasks.celery_app.celery_app worker --loglevel=info
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-construction_os}
       REDIS_URL: redis://redis:6379/0
