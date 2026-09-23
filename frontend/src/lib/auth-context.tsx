@@ -24,6 +24,18 @@ interface AuthContextType {
   refreshUserProfile: () => Promise<UserSession | null>;
 }
 
+export function setAuthCookie(token: string) {
+  if (typeof document !== 'undefined') {
+    document.cookie = `auth_token=${token}; path=/; max-age=604800; SameSite=Lax`;
+  }
+}
+
+export function clearAuthCookie() {
+  if (typeof document !== 'undefined') {
+    document.cookie = 'auth_token=; path=/; max-age=0; SameSite=Lax';
+  }
+}
+
 const AuthContext = createContext<AuthContextType>({
   user: null,
   token: null,
@@ -45,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
+      clearAuthCookie();
     }
     setToken(null);
     setUser(null);
@@ -74,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (refreshToken) {
         localStorage.setItem('refreshToken', refreshToken);
       }
+      setAuthCookie(accessToken);
     }
     setToken(accessToken);
     await refreshUserProfile();
@@ -87,6 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // If no token exists on this device, user is unauthenticated
       if (!storedToken) {
+        clearAuthCookie();
         setToken(null);
         setUser(null);
         setIsLoading(false);
@@ -94,6 +109,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setToken(storedToken);
+      setAuthCookie(storedToken);
+
       if (storedUser) {
         try {
           setUser(JSON.parse(storedUser));
@@ -121,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (refreshRes.data?.access_token) {
                 const newToken = refreshRes.data.access_token;
                 localStorage.setItem('token', newToken);
+                setAuthCookie(newToken);
                 setToken(newToken);
                 const userRes = await apiClient.get('/auth/me');
                 if (userRes.data) {
@@ -139,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             localStorage.removeItem('token');
             localStorage.removeItem('refreshToken');
             localStorage.removeItem('user');
+            clearAuthCookie();
           }
           setToken(null);
           setUser(null);
