@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { SyncStatusBadge } from '@/components/ui/SyncStatusBadge';
-import { FileText, Wallet, Users, LayoutDashboard, HardHat, LogOut, ShieldCheck, User } from 'lucide-react';
+import { FileText, Wallet, Users, LayoutDashboard, HardHat, LogOut, ShieldCheck } from 'lucide-react';
 
 export default function DashboardClientShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -92,8 +92,8 @@ export default function DashboardClientShell({ children }: { children: React.Rea
           {/* Active User Session & Logout in Desktop Sidebar */}
           <div className="border-t border-gray-200 p-3 bg-gray-50/70">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
-                <User className="h-4 w-4" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-bold shadow-xs">
+                {user?.name ? user.name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase() : 'U'}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-xs font-bold text-gray-900 truncate">

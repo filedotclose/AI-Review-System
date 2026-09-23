@@ -68,12 +68,16 @@ async def login(
 
     # Validate credential
     authenticated = False
-    if login_data.pin:
-        if user.pin_hash and verify_pin(login_data.pin, user.pin_hash):
+    secret = login_data.password or login_data.pin
+    if secret:
+        if user.pin_hash and verify_pin(secret, user.pin_hash):
             authenticated = True
-    elif login_data.password:
-        if user.password_hash and verify_password(login_data.password, user.password_hash):
+        elif user.password_hash and verify_password(secret, user.password_hash):
             authenticated = True
+    elif login_data.pin and user.pin_hash and verify_pin(login_data.pin, user.pin_hash):
+        authenticated = True
+    elif login_data.password and user.password_hash and verify_password(login_data.password, user.password_hash):
+        authenticated = True
 
     if not authenticated:
         raise HTTPException(
