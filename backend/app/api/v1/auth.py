@@ -231,6 +231,13 @@ async def get_me(current_user: User = Depends(get_current_user)):
     """
     return current_user
 
+@router.post("/logout")
+async def logout(current_user: User = Depends(get_current_user)):
+    """
+    Explicitly terminate user session on this device.
+    """
+    return {"message": "Session terminated successfully", "user_id": current_user.id}
+
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     user_in: UserCreate,

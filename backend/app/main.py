@@ -5,10 +5,13 @@ from app.api.v1 import api_router
 from app.db.base import engine, Base
 import app.models  # noqa: F401 - ensure all models are registered on Base.metadata
 
+from app.db.init_db import ensure_initial_data
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await ensure_initial_data()
     yield
 
 app = FastAPI(title="ODIPKS Construction OS API", lifespan=lifespan)
