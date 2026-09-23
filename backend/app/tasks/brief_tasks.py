@@ -380,7 +380,13 @@ async def _execute_generate_brief(
     email_res = None
     if trigger_notifications:
         phone_numbers = [getattr(settings, "WHATSAPP_OWNER_PHONE", "+919876543210")]
-        emails = [getattr(settings, "SMTP_FROM_EMAIL", "management@odipks.test")]
+        recipient_set = {
+            getattr(settings, "SMTP_FROM_EMAIL", ""),
+            getattr(settings, "SMTP_USER", ""),
+        }
+        emails = [e for e in recipient_set if e and "@" in e and not e.endswith(".test")]
+        if not emails:
+            emails = ["management@odipks.test"]
 
         try:
             import socket

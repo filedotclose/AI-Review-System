@@ -29,10 +29,13 @@ class EmailService:
 
     def _create_mime_message(self, recipients: List[str], subject: str, html_body: str, attachments: Optional[List[Dict]] = None) -> MIMEMultipart:
         """Create a MIME multipart message."""
+        sender = settings.SMTP_USER if settings.SMTP_USER and "@" in settings.SMTP_USER else settings.SMTP_FROM_EMAIL
         msg = MIMEMultipart()
-        msg['From'] = settings.SMTP_FROM_EMAIL
+        msg['From'] = f"ODIPKS Construction OS <{sender}>"
         msg['To'] = ", ".join(recipients)
         msg['Subject'] = subject
+        if settings.SMTP_FROM_EMAIL and settings.SMTP_FROM_EMAIL != sender:
+            msg['Reply-To'] = settings.SMTP_FROM_EMAIL
 
         msg.attach(MIMEText(html_body, 'html'))
 
@@ -48,10 +51,13 @@ class EmailService:
 
     def _send_sync(self, msg: MIMEMultipart, recipients: List[str]) -> None:
         """Synchronous SMTP send."""
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15) as server:
+            server.ehlo()
             server.starttls()
+            server.ehlo()
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.sendmail(settings.SMTP_FROM_EMAIL, recipients, msg.as_string())
+            sender = settings.SMTP_USER if settings.SMTP_USER and "@" in settings.SMTP_USER else settings.SMTP_FROM_EMAIL
+            server.sendmail(sender, recipients, msg.as_string())
 
     async def send_html_email(self, recipients: List[str], subject: str, html_body: str, attachments: Optional[List[Dict]] = None) -> EmailDeliveryResult:
         """Send an HTML email asynchronously."""

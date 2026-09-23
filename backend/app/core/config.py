@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
     AI_PROVIDER: str = "gemini"              # "gemini" | "groq" | "none"
-    AI_MODEL: str = "gemini-2.0-flash"       # Model identifier for primary provider
+    AI_MODEL: str = "gemini-3.5-flash-lite"  # Model identifier for primary provider
     AI_TEMPERATURE: float = 0.1
     AI_MAX_TOKENS: int = 4096
     AI_TIMEOUT_SECONDS: int = 30

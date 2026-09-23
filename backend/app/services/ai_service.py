@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 import json
@@ -109,25 +110,31 @@ class AIVerificationService:
             logger.warning("google-genai not installed, falling back to rule-based")
             return self._fallback_rule_based_review(brief_data)
 
-        try:
-            client = genai.Client(api_key=self.gemini_api_key)
-            prompt = self._build_construction_prompt(brief_data)
-            
-            response = client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type='application/json',
-                    response_schema=AIReviewResult,
-                    temperature=0.1
+        client = genai.Client(api_key=self.gemini_api_key)
+        prompt = self._build_construction_prompt(brief_data)
+        model_name = getattr(settings, "AI_MODEL", "gemini-3.5-flash-lite") or "gemini-3.5-flash-lite"
+
+        for attempt in range(3):
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type='application/json',
+                        response_schema=AIReviewResult,
+                        temperature=0.1
+                    )
                 )
-            )
-            
-            result_json = response.text
-            return AIReviewResult.model_validate_json(result_json)
-        except Exception as e:
-            logger.error(f"Gemini API verification failed: {str(e)}", exc_info=True)
-            return self._fallback_rule_based_review(brief_data)
+                result_json = response.text
+                return AIReviewResult.model_validate_json(result_json)
+            except Exception as e:
+                err_msg = str(e)
+                if attempt < 2 and any(code in err_msg for code in ["503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED"]):
+                    logger.warning(f"Gemini API transient failure ({err_msg}). Retrying in {2 * (attempt + 1)}s...")
+                    await asyncio.sleep(2 * (attempt + 1))
+                    continue
+                logger.error(f"Gemini API verification failed: {err_msg}", exc_info=True)
+                return self._fallback_rule_based_review(brief_data)
 
     async def _verify_with_groq(self, brief_data: Dict[str, Any]) -> AIReviewResult:
         """
