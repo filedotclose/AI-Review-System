@@ -17,6 +17,25 @@ export default function DashboardClientShell({ children }: { children: React.Rea
     }
   }, [isLoading, isAuthenticated, router]);
 
+  const getRoleBadge = (role?: string) => {
+    switch (role) {
+      case 'OWNER':
+        return { label: 'Company Owner', style: 'text-purple-700 bg-purple-50' };
+      case 'FINANCE_HEAD':
+        return { label: 'Finance Head', style: 'text-emerald-700 bg-emerald-50' };
+      case 'PROJECT_MANAGER':
+        return { label: 'Project Manager', style: 'text-blue-700 bg-blue-50' };
+      case 'SITE_ENGINEER':
+        return { label: 'Site Engineer', style: 'text-indigo-700 bg-indigo-50' };
+      case 'SUPERVISOR':
+        return { label: 'Site Supervisor', style: 'text-amber-700 bg-amber-50' };
+      default:
+        return { label: role?.replace('_', ' ') || 'Authorized User', style: 'text-gray-700 bg-gray-50' };
+    }
+  };
+
+  const roleInfo = getRoleBadge(user?.role);
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Desktop Sidebar */}
@@ -80,9 +99,9 @@ export default function DashboardClientShell({ children }: { children: React.Rea
                 <div className="text-xs font-bold text-gray-900 truncate">
                   {user?.name || 'Authorized User'}
                 </div>
-                <div className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 truncate uppercase">
-                  <ShieldCheck className="h-3 w-3 inline text-indigo-500" />
-                  {user?.role?.replace('_', ' ') || 'ENGINEER'}
+                <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase ${roleInfo.style}`}>
+                  <ShieldCheck className="h-2.5 w-2.5 inline" />
+                  <span>{roleInfo.label}</span>
                 </div>
               </div>
               <button
@@ -120,7 +139,7 @@ export default function DashboardClientShell({ children }: { children: React.Rea
               <div className="hidden sm:flex items-center gap-2.5 pl-3 border-l border-gray-200">
                 <div className="text-right">
                   <div className="text-xs font-semibold text-gray-900">{user.name}</div>
-                  <div className="text-[10px] text-gray-500">{user.phone || user.email}</div>
+                  <div className={`text-[10px] font-semibold px-1 rounded inline-block ${roleInfo.style}`}>{roleInfo.label}</div>
                 </div>
                 <button
                   onClick={logout}
