@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 set -e
 
 echo "=================================================="
@@ -17,11 +17,11 @@ if [ ! -f /swapfile ]; then
     free -h
 fi
 
-# 2. Update System & Install Docker & Docker Compose
+# 2. Update System & Install Docker, Compose Plugin & Fail2ban
 if ! command -v docker &> /dev/null; then
-    echo "• Installing Docker & Compose Plugin..."
+    echo "• Installing Docker, Compose Plugin & Security Tools..."
     sudo apt-get update -y
-    sudo apt-get install -y ca-certificates curl gnupg lsb-release ufw
+    sudo apt-get install -y ca-certificates curl gnupg lsb-release ufw fail2ban
     sudo install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     sudo chmod a+r /etc/apt/keyrings/docker.gpg
@@ -32,26 +32,30 @@ if ! command -v docker &> /dev/null; then
     echo "• Docker installed successfully!"
 fi
 
-# 3. Configure Security Firewall (UFW)
+# 3. Configure Fail2ban for SSH Brute-Force Defense
+echo "• Enabling Fail2ban for SSH defense..."
+sudo systemctl enable --now fail2ban || true
+
+# 4. Configure Hardened UFW Firewall (Only Ports 22, 80, 443)
 echo "• Hardening UFW firewall..."
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
-sudo ufw allow 22/tcp    # SSH
-sudo ufw allow 80/tcp    # HTTP
-sudo ufw allow 443/tcp   # HTTPS
-sudo ufw allow 3000/tcp  # Frontend UI
-sudo ufw allow 8000/tcp  # Backend API & Swagger Docs
+sudo ufw allow 22/tcp    # SSH (Lock down to admin IP in AWS SG)
+sudo ufw allow 80/tcp    # HTTP (Reverse Proxy)
+sudo ufw allow 443/tcp   # HTTPS (SSL/TLS)
+# Ports 3000 & 8000 are explicitly NOT exposed to host/public
 sudo ufw --force enable
 
-# 4. Build and Launch Containers with Docker Compose
-echo "• Building and launching Docker Compose stack..."
+# 5. Build and Launch Containers with Docker Compose
+echo "• Building and launching Docker Compose stack with Nginx..."
 sudo docker compose down || true
 sudo docker compose up -d --build
 
 SERVER_IP=$(curl -s http://checkip.amazonaws.com || echo "localhost")
 
 echo "=================================================="
-echo "  DEPLOYMENT COMPLETE!"
-echo "  Frontend UI:   http://${SERVER_IP}:3000"
-echo "  Backend Docs:  http://${SERVER_IP}:8000/docs"
+echo "  DEPLOYMENT COMPLETE (PROTECTED BY NGINX PROXY)!"
+echo "  Application UI:    http://${SERVER_IP}"
+echo "  API Documentation: http://${SERVER_IP}/docs"
+echo "  Rate Limiting:     ACTIVE (Auth: 3r/s, API: 10r/s)"
 echo "=================================================="

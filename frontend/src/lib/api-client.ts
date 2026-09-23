@@ -28,14 +28,19 @@ export const getApiBaseUrl = (): string => {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  if (typeof window !== 'undefined' && window.location?.hostname) {
+  if (typeof window !== 'undefined') {
+    // When served via Nginx reverse proxy on standard ports (80/443), use clean relative path
+    if (!window.location.port || window.location.port === '80' || window.location.port === '443') {
+      return '/api/v1';
+    }
+    // Local development fallback when running frontend on separate dev port (e.g. :3000)
     return `http://${window.location.hostname}:8000/api/v1`;
   }
-  return 'http://localhost:8000/api/v1';
+  return '/api/v1';
 };
 
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || '/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
