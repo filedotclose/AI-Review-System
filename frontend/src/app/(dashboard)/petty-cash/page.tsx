@@ -1,30 +1,28 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import apiClient, { isOfflineQueued, getApiBaseUrl } from '@/lib/api-client';
-import { compressImage, fileToDataUrl, formatFileSize } from '@/lib/image-compression';
+import apiClient, { isOfflineQueued } from '@/lib/api-client';
+import { compressImage, fileToDataUrl } from '@/lib/image-compression';
 import { useAuth } from '@/lib/auth-context';
 import {
-  Wallet,
   PlusCircle,
-  Download,
-  AlertTriangle,
-  CheckCircle2,
   Receipt,
-  AlertCircle,
-  X,
   Camera,
-  Trash2,
-  TrendingDown,
-  RefreshCw,
-  CloudOff,
   ShieldCheck,
   Check,
+  CheckCircle2,
   Ban,
   ArrowUpRight,
   Layers,
-  FileCheck,
 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table';
+import { Modal } from '@/components/ui/Modal';
+import { Toast } from '@/components/ui/Toast';
+import { MaskedField } from '@/components/ui/MaskedField';
 
 interface ExpenseItem {
   id: number | string;
@@ -105,7 +103,6 @@ export default function PettyCashPage() {
   const [walletBalance, setWalletBalance] = useState(14500.0);
   const [supervisorDeficit, setSupervisorDeficit] = useState(2050.0);
   const [expenses, setExpenses] = useState<ExpenseItem[]>(INITIAL_EXPENSES);
-  const [isLoadingWallet, setIsLoadingWallet] = useState(false);
 
   // Role Differentiation Flags
   const isFinanceOrOwner = user?.role === 'FINANCE_HEAD' || user?.role === 'OWNER';
@@ -131,10 +128,11 @@ export default function PettyCashPage() {
   const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
   const [settleTargetTx, setSettleTargetTx] = useState<ExpenseItem | null>(null);
   const [settleUtrRef, setSettleUtrRef] = useState('');
+  const [receiptModalUrl, setReceiptModalUrl] = useState<string | null>(null);
 
   // Form State
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('FUEL');
+  const [category, setCategory] = useState('DIESEL');
   const [description, setDescription] = useState('');
   const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [quantity, setQuantity] = useState('');
@@ -155,13 +153,12 @@ export default function PettyCashPage() {
   const [replenishDesc, setReplenishDesc] = useState('Weekly site petty cash replenishment');
 
   // UI Feedback
-  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'offline' | 'error'; text: string } | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'warning' | 'error' | 'info'; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
 
   // Fetch live wallet balance from backend if available
   const fetchWallet = useCallback(async () => {
-    setIsLoadingWallet(true);
     try {
       const res = await apiClient.get(`/petty-cash/wallet/${siteId}`);
       if (res.data) {
@@ -170,8 +167,6 @@ export default function PettyCashPage() {
       }
     } catch {
       // Backend may not be reachable in pure offline mode
-    } finally {
-      setIsLoadingWallet(false);
     }
   }, [siteId]);
 
@@ -179,7 +174,7 @@ export default function PettyCashPage() {
     fetchWallet();
   }, [fetchWallet]);
 
-  // Duplicate check logic (Vulnerability 4)
+  // Duplicate check logic
   const duplicateWarning = useMemo(() => {
     const numAmount = parseFloat(amount);
     if (!numAmount || isNaN(numAmount)) return null;
@@ -190,12 +185,12 @@ export default function PettyCashPage() {
     });
 
     if (matched) {
-      return `Potential duplicate detected! An expense of ₹${matched.amount.toLocaleString()} in category ${matched.category} was already recorded on ${matched.date} (${matched.description}).`;
+      return `Potential duplicate detected! An expense of ₹${matched.amount.toLocaleString('en-IN')} in category ${matched.category} was already recorded on ${matched.date}.`;
     }
     return null;
   }, [amount, category, expenses]);
 
-  // Deficit Cap check (Vulnerability 5 - ₹50k Cap)
+  // Deficit Cap check
   const deficitCapWarning = useMemo(() => {
     const numAmount = parseFloat(amount) || 0;
     const projectedDeficit = isOutOfPocket
@@ -207,12 +202,12 @@ export default function PettyCashPage() {
     if (projectedDeficit > 50000) {
       return {
         isExceeded: true,
-        message: `Strict Deficit Cap Exceeded: Projected out-of-pocket deficit ₹${projectedDeficit.toLocaleString()} exceeds the maximum ₹50,000 threshold. Submission will be rejected by AnomalyDetector.`,
+        message: `Strict Deficit Cap Exceeded: Projected out-of-pocket deficit ₹${projectedDeficit.toLocaleString('en-IN')} exceeds the maximum ₹50,000 threshold.`,
       };
     } else if (projectedDeficit > 40000) {
       return {
         isExceeded: false,
-        message: `High Deficit Warning: Projected deficit is ₹${projectedDeficit.toLocaleString()} (₹${(50000 - projectedDeficit).toLocaleString()} remaining before ₹50,000 hard cap).`,
+        message: `High Deficit Advisory: Projected deficit is ₹${projectedDeficit.toLocaleString('en-IN')} (₹${(50000 - projectedDeficit).toLocaleString('en-IN')} remaining before ₹50,000 cap).`,
       };
     }
     return null;
@@ -288,7 +283,7 @@ export default function PettyCashPage() {
 
       setToastMessage({
         type: 'success',
-        text: `Expense of ₹${numAmount.toLocaleString()} recorded successfully!`,
+        text: `Expense of ₹${numAmount.toLocaleString('en-IN')} recorded successfully.`,
       });
       setIsExpenseModalOpen(false);
       resetExpenseForm();
@@ -314,8 +309,8 @@ export default function PettyCashPage() {
         }
 
         setToastMessage({
-          type: 'offline',
-          text: `Expense of ₹${numAmount.toLocaleString()} saved offline! Queued for sync when online.`,
+          type: 'warning',
+          text: `Expense of ₹${numAmount.toLocaleString('en-IN')} saved offline. Will sync when reconnected.`,
         });
         setIsExpenseModalOpen(false);
         resetExpenseForm();
@@ -353,14 +348,14 @@ export default function PettyCashPage() {
       });
       setToastMessage({
         type: 'success',
-        text: `Reimbursement request of ₹${reimbAmt.toLocaleString()} submitted!`,
+        text: `Reimbursement request of ₹${reimbAmt.toLocaleString('en-IN')} submitted for finance sign-off.`,
       });
       setIsReimburseModalOpen(false);
     } catch (err: unknown) {
       if (isOfflineQueued(err)) {
         setToastMessage({
-          type: 'offline',
-          text: `Reimbursement request of ₹${reimbAmt.toLocaleString()} queued offline for sync.`,
+          type: 'warning',
+          text: `Reimbursement request of ₹${reimbAmt.toLocaleString('en-IN')} queued offline for sync.`,
         });
         setIsReimburseModalOpen(false);
       } else {
@@ -423,7 +418,7 @@ export default function PettyCashPage() {
       setSupervisorDeficit((prev) => Math.max(0, prev - settleTargetTx.amount));
       setToastMessage({
         type: 'success',
-        text: `Reimbursement of ₹${settleTargetTx.amount.toLocaleString()} settled with UTR: ${settleUtrRef}`,
+        text: `Reimbursement settled with Bank UTR: ${settleUtrRef}.`,
       });
       setIsSettleModalOpen(false);
       setSettleTargetTx(null);
@@ -451,7 +446,7 @@ export default function PettyCashPage() {
       setWalletBalance((prev) => prev + amt);
       setToastMessage({
         type: 'success',
-        text: `Site Petty Cash Wallet replenished with ₹${amt.toLocaleString()}!`,
+        text: `Petty cash wallet replenished by ₹${amt.toLocaleString('en-IN')}.`,
       });
       setIsReplenishModalOpen(false);
     } catch (err: unknown) {
@@ -462,1024 +457,683 @@ export default function PettyCashPage() {
     }
   };
 
-  // Tally XML Export Download
-  const handleTallyExport = async () => {
-    try {
-      const baseURL = getApiBaseUrl();
-      const url = `${baseURL}/petty-cash/tally-export?site_id=${siteId}&format=xml`;
-      const token = localStorage.getItem('token');
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch(url, { headers });
-      if (!res.ok) throw new Error('Export request failed');
-      const xmlData = await res.text();
-
-      const blob = new Blob([xmlData], { type: 'application/xml' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `Tally_PettyCash_Site${siteId}_${new Date().toISOString().split('T')[0]}.xml`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      setToastMessage({
-        type: 'success',
-        text: 'Tally Prime XML vouchers successfully exported!',
-      });
-    } catch {
-      // Fallback local XML generator
-      const vouchersXml = expenses
-        .map(
-          (t) => `    <VOUCHER VCHTYPE="Payment" ACTION="Create">
-      <DATE>${t.date.replace(/-/g, '')}</DATE>
-      <VOUCHERTYPENAME>Payment</VOUCHERTYPENAME>
-      <NARRATION>${t.description.replace(/&/g, '&amp;')}</NARRATION>
-      <ALLLEDGERENTRIES.LIST>
-        <LEDGERNAME>${t.category}</LEDGERNAME>
-        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-        <AMOUNT>-${t.amount.toFixed(2)}</AMOUNT>
-      </ALLLEDGERENTRIES.LIST>
-      <ALLLEDGERENTRIES.LIST>
-        <LEDGERNAME>Petty Cash</LEDGERNAME>
-        <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
-        <AMOUNT>${t.amount.toFixed(2)}</AMOUNT>
-      </ALLLEDGERENTRIES.LIST>
-    </VOUCHER>`
-        )
-        .join('\n');
-
-      const fullXml = `<ENVELOPE>
-  <HEADER>
-    <TALLYREQUEST>Import Data</TALLYREQUEST>
-  </HEADER>
-  <BODY>
-    <IMPORTDATA>
-      <REQUESTDESC><REPORTNAME>All Masters</REPORTNAME></REQUESTDESC>
-      <REQUESTDATA>
-${vouchersXml}
-      </REQUESTDATA>
-    </IMPORTDATA>
-  </BODY>
-</ENVELOPE>`;
-
-      const blob = new Blob([fullXml], { type: 'application/xml' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `Tally_PettyCash_Site${siteId}_${new Date().toISOString().split('T')[0]}.xml`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      setToastMessage({
-        type: 'success',
-        text: 'Tally Prime XML vouchers generated and downloaded!',
-      });
-    }
-  };
-
-  const pendingExpenses = useMemo(() => {
-    return expenses.filter((e) => e.approval_status === 'PENDING');
-  }, [expenses]);
-
-  const dueReimbursements = useMemo(() => {
-    return expenses.filter((e) => e.is_out_of_pocket && e.reimbursement_status === 'DUE');
-  }, [expenses]);
-
-  const filteredExpenses = useMemo(() => {
-    if (filterCategory === 'ALL') return expenses;
-    return expenses.filter((e) => e.category === filterCategory);
-  }, [expenses, filterCategory]);
+  const pendingApprovalsCount = expenses.filter((e) => e.approval_status === 'PENDING').length;
+  const filteredExpenses =
+    filterCategory === 'ALL'
+      ? expenses
+      : expenses.filter((e) => e.category === filterCategory);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8 space-y-6">
-      {/* Top Banner Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
-              <Wallet className="h-6 w-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Petty Cash & Disbursements</h1>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-700 border">
-                  {user?.role?.replace('_', ' ') || 'Site Wallet'}
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-gray-500">
-                {isFinanceOrOwner
-                  ? 'Commercial Controller Hub: Approve vouchers, settle claims, and export to Tally'
-                  : 'Site Operations: Log emergency cash spends and track out-of-pocket claims'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Controls - Dynamic by Role */}
-        <div className="flex flex-wrap items-center gap-2">
-          {isFinanceOrOwner && (
-            <>
-              <button
-                type="button"
-                onClick={handleTallyExport}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
-              >
-                <Download className="h-3.5 w-3.5 text-gray-500" />
-                <span>Export Tally XML</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsReplenishModalOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-700 shadow-xs hover:bg-emerald-100 transition-colors cursor-pointer"
-              >
-                <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Replenish Wallet</span>
-              </button>
-            </>
-          )}
-
-          {isSupervisorOrEngineer && (
-            <button
-              type="button"
-              onClick={() => setIsReimburseModalOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 shadow-xs hover:bg-indigo-100 transition-colors cursor-pointer"
-            >
-              <Receipt className="h-3.5 w-3.5 text-indigo-600" />
-              <span>Claim Reimbursement</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setIsExpenseModalOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-emerald-500 transition-colors cursor-pointer"
-          >
-            <PlusCircle className="h-3.5 w-3.5" />
-            <span>{isFinanceOrOwner ? 'Log Voucher' : 'Log New Expense'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Notifications */}
+    <div className="max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8 space-y-6 select-none font-sans">
+      {/* Toast Feedback */}
       {toastMessage && (
-        <div
-          className={`rounded-lg p-4 border flex items-start gap-3 shadow-xs ${
-            toastMessage.type === 'success'
-              ? 'bg-green-50 border-green-200 text-green-900'
-              : toastMessage.type === 'offline'
-              ? 'bg-amber-50 border-amber-200 text-amber-900'
-              : 'bg-red-50 border-red-200 text-red-900'
-          }`}
-        >
-          {toastMessage.type === 'success' && <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />}
-          {toastMessage.type === 'offline' && <CloudOff className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />}
-          {toastMessage.type === 'error' && <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />}
-          <div className="flex-1 text-xs font-medium">{toastMessage.text}</div>
-          <button onClick={() => setToastMessage(null)} className="text-xs font-semibold hover:underline cursor-pointer">
-            Dismiss
-          </button>
-        </div>
+        <Toast
+          message={toastMessage.text}
+          type={toastMessage.type}
+          onDismiss={() => setToastMessage(null)}
+        />
       )}
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Wallet Balance */}
-        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Site Wallet Balance</span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={fetchWallet}
-                disabled={isLoadingWallet}
-                title="Refresh wallet balance"
-                className="p-1 rounded-md text-emerald-600 hover:bg-emerald-50 cursor-pointer"
+      {/* Header & Wallet Balances (with MaskedField for Confidentiality) */}
+      <div className="bg-surface p-6 rounded-lg border border-border shadow-soft space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-text">
+                Site Petty Cash & Commercial Approvals
+              </h1>
+              <Badge variant="accent" size="sm">
+                Financial Audit
+              </Badge>
+            </div>
+            <p className="text-xs text-text-muted mt-1 leading-relaxed">
+              Confidential Site Ledger with Automated Duplicate Anomaly Screening & Deficit Protection
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {isFinanceOrOwner && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsReplenishModalOpen(true)}
+                leftIcon={<PlusCircle className="h-3.5 w-3.5" />}
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${isLoadingWallet ? 'animate-spin' : ''}`} />
-              </button>
-              <span className="p-1.5 bg-emerald-50 text-emerald-600 rounded-md">
-                <Wallet className="h-4 w-4" />
+                Replenish Float
+              </Button>
+            )}
+
+            {supervisorDeficit > 0 && isSupervisorOrEngineer && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsReimburseModalOpen(true)}
+                leftIcon={<ArrowUpRight className="h-3.5 w-3.5" />}
+              >
+                Claim Out-of-Pocket
+              </Button>
+            )}
+
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setIsExpenseModalOpen(true)}
+              leftIcon={<PlusCircle className="h-3.5 w-3.5" />}
+            >
+              Record Site Expense
+            </Button>
+          </div>
+        </div>
+
+        {/* Financial Balance Scorecards (Masked by default for Confidentiality) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-2 border-t border-border">
+          <div className="p-4 rounded-lg bg-surface-sunk/60 border border-border space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                Site Float Balance
+              </span>
+              <span className="text-[10px] text-text-faint">Confidential</span>
+            </div>
+            <div className="text-xl sm:text-2xl font-semibold text-text font-mono">
+              <MaskedField value={walletBalance} maskType="currency" />
+            </div>
+            <span className="text-[11px] text-text-muted block">
+              ADANI-ODIPKS Site Office Primary Float
+            </span>
+          </div>
+
+          <div className="p-4 rounded-lg bg-surface-sunk/60 border border-border space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                Supervisor Deficit
+              </span>
+              <Badge variant={supervisorDeficit > 40000 ? 'danger' : 'warning'} size="sm">
+                Out-of-Pocket
+              </Badge>
+            </div>
+            <div className="text-xl sm:text-2xl font-semibold text-status-warning font-mono">
+              <MaskedField value={supervisorDeficit} maskType="currency" />
+            </div>
+            <span className="text-[11px] text-text-muted block">
+              Max allowable deficit cap: ₹50,000
+            </span>
+          </div>
+
+          <div className="p-4 rounded-lg bg-surface-sunk/60 border border-border space-y-1 sm:col-span-2 lg:col-span-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                Approvals Queue
+              </span>
+              <span className="text-[10px] text-text-faint font-mono">
+                {pendingApprovalsCount} Pending
               </span>
             </div>
-          </div>
-          <div className="mt-2 text-2xl sm:text-3xl font-bold text-emerald-600">
-            ₹{walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </div>
-          <p className="mt-1 text-[11px] text-gray-500">Available cash in site office drawer</p>
-        </div>
-
-        {/* Supervisor Deficit */}
-        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Out-of-Pocket Due</span>
-            <span className="p-1.5 bg-amber-50 text-amber-600 rounded-md">
-              <TrendingDown className="h-4 w-4" />
+            <div className="text-xl sm:text-2xl font-semibold text-accent font-mono tabular-nums">
+              {pendingApprovalsCount} <span className="text-sm font-sans font-normal text-text-muted">Vouchers</span>
+            </div>
+            <span className="text-[11px] text-text-muted block">
+              {pendingApprovalsCount > 0 ? 'Requires controller sign-off' : 'All vouchers reconciled'}
             </span>
           </div>
-          <div className="mt-2 text-2xl sm:text-3xl font-bold text-amber-600">
-            ₹{supervisorDeficit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </div>
-          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-gray-500">
-            <span>Spent from personal funds</span>
-            <span className="text-amber-700 font-medium">• {dueReimbursements.length} pending settlement</span>
-          </div>
-        </div>
-
-        {/* Cap Limit */}
-        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">₹50k Deficit Safety Headroom</span>
-            <span className={`p-1.5 rounded-md ${supervisorDeficit > 40000 ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
-              <AlertTriangle className="h-4 w-4" />
-            </span>
-          </div>
-          <div className="mt-2 text-2xl sm:text-3xl font-bold text-gray-900">
-            ₹{Math.max(0, 50000 - supervisorDeficit).toLocaleString('en-IN')}
-          </div>
-          <div className="mt-2 w-full bg-gray-100 rounded-full h-2">
-            <div
-              className={`h-2 rounded-full transition-all ${supervisorDeficit > 40000 ? 'bg-red-500' : 'bg-indigo-500'}`}
-              style={{ width: `${Math.min(100, (supervisorDeficit / 50000) * 100)}%` }}
-            />
-          </div>
-          <p className="mt-1 text-[11px] text-gray-400">Enforced by backend RBAC & deficit anomaly checks</p>
         </div>
       </div>
 
-      {/* Role-Specific Workspace Navigation Tabs */}
-      <div className="flex border-b border-gray-200 bg-white px-4 rounded-t-xl">
+      {/* Tabs */}
+      <div className="flex border-b border-border bg-surface px-4 rounded-t-lg">
         {isFinanceOrOwner && (
           <button
+            type="button"
             onClick={() => setActiveTab('approvals')}
-            className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-bold transition-colors cursor-pointer ${
+            className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-semibold transition-colors cursor-pointer ${
               activeTab === 'approvals'
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-text-muted hover:text-text'
             }`}
           >
             <ShieldCheck className="h-4 w-4" />
-            <span>Approval & Settlement Queue</span>
-            {pendingExpenses.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800 font-bold">
-                {pendingExpenses.length}
-              </span>
+            <span>Commercial Approvals</span>
+            {pendingApprovalsCount > 0 && (
+              <Badge variant="warning" size="sm">
+                {pendingApprovalsCount}
+              </Badge>
             )}
           </button>
         )}
 
         <button
+          type="button"
           onClick={() => setActiveTab('ledger')}
-          className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-bold transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-semibold transition-colors cursor-pointer ${
             activeTab === 'ledger'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-text-muted hover:text-text'
           }`}
         >
           <Layers className="h-4 w-4" />
-          <span>{isSupervisorOrEngineer ? 'My Claims History' : 'Complete Ledger'}</span>
+          <span>Voucher Ledger</span>
         </button>
-
-        {isSupervisorOrEngineer && (
-          <button
-            onClick={() => setActiveTab('entry')}
-            className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-bold transition-colors cursor-pointer ${
-              activeTab === 'entry'
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <PlusCircle className="h-4 w-4" />
-            <span>Submit Site Expense</span>
-          </button>
-        )}
       </div>
 
-      {/* TAB 1: Finance Approval & Settlement Queue (Visible to Finance Head & Owner) */}
+      {/* TAB 1: Finance Approvals Queue */}
       {isFinanceOrOwner && activeTab === 'approvals' && (
-        <div className="space-y-6">
-          {/* Pending Approval Section */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                  <span>Pending Expense Approvals</span>
-                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                    {pendingExpenses.length} awaiting review
-                  </span>
-                </h2>
-                <p className="text-xs text-gray-500">Review field vouchers submitted by Site Engineers and Supervisors</p>
-              </div>
-            </div>
-
-            {pendingExpenses.length === 0 ? (
-              <div className="p-8 text-center text-gray-500 text-xs">
-                <FileCheck className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
-                <p className="font-semibold text-gray-800">All expenses are reviewed!</p>
-                <p className="text-gray-400 mt-0.5">No pending claims in the queue for this site.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-left text-xs">
-                  <thead className="bg-gray-50 text-gray-500 font-semibold uppercase tracking-wider">
-                    <tr>
-                      <th className="px-4 py-3">Date</th>
-                      <th className="px-4 py-3">Category</th>
-                      <th className="px-4 py-3">Description</th>
-                      <th className="px-4 py-3 text-right">Amount (₹)</th>
-                      <th className="px-4 py-3 text-center">Out-of-Pocket</th>
-                      <th className="px-4 py-3 text-center">Physical Bill</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
-                    {pendingExpenses.map((tx) => (
-                      <tr key={tx.id} className="hover:bg-gray-50/70 transition-colors">
-                        <td className="px-4 py-3 font-medium text-gray-700 whitespace-nowrap">{tx.date}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-800">
-                            {tx.category}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">{tx.description}</td>
-                        <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
-                          ₹{tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {tx.is_out_of_pocket ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                              Yes (Supervisor)
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">Site Drawer</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {tx.has_physical_bill ? (
-                            <span className="text-emerald-700 font-semibold flex items-center justify-center gap-1">
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Attached
-                            </span>
-                          ) : (
-                            <span className="text-amber-600 font-semibold">No Bill</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => handleApproveExpense(tx.id)}
-                              title="Approve Expense Voucher"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 transition-colors cursor-pointer"
-                            >
-                              <Check className="h-3 w-3" />
-                              <span>Approve</span>
-                            </button>
-                            <button
-                              onClick={() => handleRejectExpense(tx.id)}
-                              title="Reject Voucher"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 rounded text-xs font-bold hover:bg-red-100 transition-colors cursor-pointer"
-                            >
-                              <Ban className="h-3 w-3" />
-                              <span>Reject</span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between pb-1">
+            <h2 className="text-sm font-semibold text-text uppercase tracking-wider">
+              Pending Vouchers Awaiting Audit ({pendingApprovalsCount})
+            </h2>
+            <span className="text-xs text-text-faint">
+              AI checks for duplicate amounts within 7 days and 48-hour description overlap
+            </span>
           </div>
 
-          {/* Out-of-Pocket Reimbursements Settlement Section */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                  <span>Reimbursements Settlement Queue</span>
-                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                    {dueReimbursements.length} due payment
-                  </span>
-                </h2>
-                <p className="text-xs text-gray-500">Disburse approved out-of-pocket claims back to field supervisors</p>
-              </div>
-            </div>
-
-            {dueReimbursements.length === 0 ? (
-              <div className="p-8 text-center text-gray-500 text-xs">
-                <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
-                <p className="font-semibold text-gray-800">All reimbursements settled!</p>
-                <p className="text-gray-400 mt-0.5">No supervisor is owed funds currently.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-left text-xs">
-                  <thead className="bg-gray-50 text-gray-500 font-semibold uppercase tracking-wider">
-                    <tr>
-                      <th className="px-4 py-3">Expense ID</th>
-                      <th className="px-4 py-3">Date</th>
-                      <th className="px-4 py-3">Description</th>
-                      <th className="px-4 py-3 text-right">Amount (₹)</th>
-                      <th className="px-4 py-3 text-center">Approval</th>
-                      <th className="px-4 py-3 text-right">Settlement Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
-                    {dueReimbursements.map((tx) => (
-                      <tr key={tx.id} className="hover:bg-gray-50/70 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-gray-900">#{tx.id}</td>
-                        <td className="px-4 py-3 text-gray-700">{tx.date}</td>
-                        <td className="px-4 py-3 font-medium text-gray-900 max-w-sm truncate">{tx.description}</td>
-                        <td className="px-4 py-3 text-right font-bold text-amber-700">
-                          ₹{tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              tx.approval_status === 'APPROVED'
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'bg-amber-50 text-amber-700'
-                            }`}
-                          >
-                            {tx.approval_status}
+          <div className="space-y-3">
+            {expenses
+              .filter((e) => e.approval_status === 'PENDING')
+              .map((exp) => (
+                <Card key={exp.id} padding="md" className="space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-pill bg-accent-soft text-accent flex items-center justify-center font-mono text-xs font-semibold border border-accent/20">
+                        #{exp.id}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-text text-sm">
+                            {exp.description}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <button
-                            onClick={() => {
-                              setSettleTargetTx(tx);
-                              setSettleUtrRef(`NEFT-${Date.now().toString().slice(-6)}`);
-                              setIsSettleModalOpen(true);
-                            }}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold hover:bg-indigo-700 transition-colors cursor-pointer"
-                          >
-                            <Receipt className="h-3 w-3" />
-                            <span>Settle & Pay</span>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          <Badge variant="neutral" size="sm">
+                            {exp.category}
+                          </Badge>
+                          {exp.is_out_of_pocket && (
+                            <Badge variant="warning" size="sm">
+                              Out-of-Pocket Claim
+                            </Badge>
+                          )}
+                        </div>
+                        <span className="text-xs text-text-muted mt-0.5 block">
+                          Recorded on {exp.date} • Physical Bill Present: {exp.has_physical_bill ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-base font-bold font-mono text-text">
+                        <MaskedField value={exp.amount} maskType="currency" />
+                      </div>
+                      <Badge variant="warning" size="sm" className="mt-1">
+                        Pending Verification
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Actions for Finance Head */}
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-2 text-xs text-text-muted">
+                      {exp.has_physical_bill && (
+                        <button
+                          type="button"
+                          onClick={() => setReceiptModalUrl('/sample-bill.jpg')}
+                          className="text-accent hover:underline flex items-center gap-1"
+                        >
+                          <Receipt className="h-3.5 w-3.5" />
+                          <span>Inspect Bill Voucher</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleRejectExpense(exp.id)}
+                        leftIcon={<Ban className="h-3.5 w-3.5" />}
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleApproveExpense(exp.id)}
+                        leftIcon={<Check className="h-3.5 w-3.5" />}
+                      >
+                        Approve Voucher
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+
+            {pendingApprovalsCount === 0 && (
+              <Card padding="lg" className="text-center py-12 space-y-2">
+                <CheckCircle2 className="h-8 w-8 text-status-success mx-auto" />
+                <h3 className="text-sm font-semibold text-text">All Petty Cash Vouchers Verified</h3>
+                <p className="text-xs text-text-muted max-w-sm mx-auto">
+                  No pending expenditures in the queue. All transactions have been audited and signed off.
+                </p>
+              </Card>
             )}
           </div>
         </div>
       )}
 
-      {/* TAB 2: Complete Ledger & History */}
+      {/* TAB 2: Ledger */}
       {activeTab === 'ledger' && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden">
-          <div className="p-4 sm:p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-bold text-gray-900">Site Expense Ledger</h2>
-              <p className="text-xs text-gray-500">Audit trail of all recorded petty cash transactions</p>
-            </div>
+        <Card padding="md">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div>
+                <CardTitle>Petty Cash Transaction Ledger</CardTitle>
+                <CardDescription>All disbursements, reimbursements, and float movements.</CardDescription>
+              </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Category:</span>
+              {/* Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-text-muted">Category:</span>
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="bg-surface-sunk border border-border rounded-md text-xs py-1 px-2.5 text-text focus:outline-none"
+                >
+                  <option value="ALL">All Categories</option>
+                  <option value="DIESEL">Diesel</option>
+                  <option value="SPARES">Rig Spares</option>
+                  <option value="FOOD_WATER">Food & Water</option>
+                  <option value="TRANSPORT">Transport</option>
+                  <option value="TOOLS">Tools & Consumables</option>
+                </select>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Voucher</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead align="right">Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Settlement</TableHead>
+                  <TableHead align="right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredExpenses.map((exp) => (
+                  <TableRow key={exp.id}>
+                    <TableCell isNumeric>#{exp.id}</TableCell>
+                    <TableCell className="font-mono text-xs">{exp.date}</TableCell>
+                    <TableCell>
+                      <Badge variant="neutral" size="sm">
+                        {exp.category}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate">{exp.description}</TableCell>
+                    <TableCell align="right" isNumeric>
+                      <MaskedField value={exp.amount} maskType="currency" />
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          exp.approval_status === 'APPROVED'
+                            ? 'verified'
+                            : exp.approval_status === 'REJECTED'
+                            ? 'danger'
+                            : 'warning'
+                        }
+                        size="sm"
+                      >
+                        {exp.approval_status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-text-muted font-mono">
+                        {exp.reimbursement_status}
+                      </span>
+                    </TableCell>
+                    <TableCell align="right">
+                      {isFinanceOrOwner &&
+                        exp.is_out_of_pocket &&
+                        exp.approval_status === 'APPROVED' &&
+                        exp.reimbursement_status === 'DUE' && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setSettleTargetTx(exp);
+                              setIsSettleModalOpen(true);
+                            }}
+                          >
+                            Settle UTR
+                          </Button>
+                        )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* MODAL 1: Record Site Expense */}
+      <Modal
+        isOpen={isExpenseModalOpen}
+        onClose={() => setIsExpenseModalOpen(false)}
+        title="Record Site Cash Expense"
+        description="Enter voucher details for fuel, machine spares, or emergency site supplies."
+        maxWidth="lg"
+      >
+        <form onSubmit={handleExpenseSubmit} className="space-y-4">
+          {duplicateWarning && (
+            <div className="rounded-md bg-status-warning-soft p-3 border border-status-warning/20 text-xs text-status-warning">
+              {duplicateWarning}
+            </div>
+          )}
+
+          {deficitCapWarning && (
+            <div
+              className={`rounded-md p-3 border text-xs ${
+                deficitCapWarning.isExceeded
+                  ? 'bg-status-danger-soft border-status-danger/20 text-status-danger'
+                  : 'bg-status-warning-soft border-status-warning/20 text-status-warning'
+              }`}
+            >
+              {deficitCapWarning.message}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Expense Amount (₹)"
+              type="number"
+              step="1"
+              required
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="e.g. 1500"
+            />
+
+            <div>
+              <label className="block text-xs font-medium uppercase tracking-wider text-text-muted mb-1.5">
+                Category
+              </label>
               <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                aria-label="Filter expenses by category"
-                className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs shadow-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full bg-surface-sunk border border-border rounded-md text-xs sm:text-sm py-2 px-3 text-text focus:outline-none focus:border-accent"
               >
-                <option value="ALL">All Categories</option>
-                <option value="DIESEL">Diesel</option>
-                <option value="SPARES">Spares & Seals</option>
-                <option value="FOOD_WATER">Food & Water</option>
-                <option value="TRANSPORT">Transport</option>
-                <option value="LABOUR">Direct Labour</option>
-                <option value="TOOLS">Tools & Hardware</option>
+                <option value="DIESEL">Emergency Diesel</option>
+                <option value="SPARES">Rig & Plant Spares</option>
+                <option value="FOOD_WATER">Crew Refreshments / Water</option>
+                <option value="TRANSPORT">Local Transport / Courier</option>
+                <option value="TOOLS">Welding & Tools</option>
+                <option value="SAFETY">Safety Gear</option>
               </select>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-left text-xs">
-              <thead className="bg-gray-50 text-gray-500 font-semibold uppercase tracking-wider">
-                <tr>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3">Description</th>
-                  <th className="px-4 py-3 text-right">Amount (₹)</th>
-                  <th className="px-4 py-3 text-center">Type</th>
-                  <th className="px-4 py-3 text-center">Approval</th>
-                  <th className="px-4 py-3 text-center">Reimbursement</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
-                {filteredExpenses.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-gray-50/70 transition-colors">
-                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap font-medium">{tx.date}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-800">
-                        {tx.category}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-900 max-w-sm truncate">{tx.description}</td>
-                    <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
-                      ₹{tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
-                      {tx.is_out_of_pocket ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                          Out-of-Pocket
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700">
-                          Site Wallet
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          tx.approval_status === 'APPROVED'
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : tx.approval_status === 'REJECTED'
-                            ? 'bg-red-50 text-red-700'
-                            : 'bg-amber-50 text-amber-700'
-                        }`}
-                      >
-                        {tx.approval_status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
-                      {tx.reimbursement_status === 'SETTLED' ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          Settled
-                        </span>
-                      ) : tx.reimbursement_status === 'DUE' ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                          Due
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+          <Input
+            label="Voucher Description / Vendor Note"
+            required
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="e.g. 15 liters diesel for standby DG set"
+          />
 
-      {/* TAB 3: Inline Submit Expense Voucher (For Supervisor / Site Engineer) */}
-      {isSupervisorOrEngineer && activeTab === 'entry' && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xs max-w-3xl mx-auto">
-          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
-            <Receipt className="h-5 w-5 text-indigo-600" />
-            <h2 className="text-base font-bold text-gray-900">Submit Site Expense Voucher</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Expense Date"
+              type="date"
+              value={expenseDate}
+              onChange={(e) => setExpenseDate(e.target.value)}
+            />
+
+            <div className="flex items-center gap-4 pt-6">
+              <label className="flex items-center gap-2 text-xs font-medium text-text cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isOutOfPocket}
+                  onChange={(e) => setIsOutOfPocket(e.target.checked)}
+                  className="rounded border-border text-accent focus:ring-accent"
+                />
+                <span>Supervisor Paid Out-of-Pocket</span>
+              </label>
+
+              <label className="flex items-center gap-2 text-xs font-medium text-text cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hasPhysicalBill}
+                  onChange={(e) => setHasPhysicalBill(e.target.checked)}
+                  className="rounded border-border text-accent focus:ring-accent"
+                />
+                <span>Physical Bill Present</span>
+              </label>
+            </div>
           </div>
 
-          <form onSubmit={handleExpenseSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700">Amount (₹) *</label>
+          {/* Photo upload */}
+          <div>
+            <label className="block text-xs font-medium uppercase tracking-wider text-text-muted mb-1.5">
+              Voucher Slip / Receipt Photograph
+            </label>
+            <div className="flex items-center gap-3">
+              <label className="cursor-pointer">
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-pill bg-surface-sunk border border-border text-text hover:bg-surface transition-colors">
+                  <Camera className="h-3.5 w-3.5" />
+                  <span>Attach Bill Photo</span>
+                </span>
                 <input
-                  type="number"
-                  step="0.01"
-                  required
-                  placeholder="e.g. 1500"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-semibold"
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700">Category *</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="FUEL">Diesel & Generator Fuel</option>
-                  <option value="TOOLS">Rig Spares & Consumables</option>
-                  <option value="WELDING_REPAIR">Hardware, Gas & Welding</option>
-                  <option value="FOOD_WATER">Crew Refreshments & Water</option>
-                  <option value="TRANSPORT">Local Transport & Courier</option>
-                  <option value="OTHER">Other Emergency Site Expense</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700">Quantity (Optional)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  placeholder="e.g. 25"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700">Unit</label>
-                <select
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                >
-                  <option value="Liters">Liters</option>
-                  <option value="Nos">Nos / Units</option>
-                  <option value="Kg">Kg</option>
-                  <option value="Bags">Bags</option>
-                  <option value="Trips">Trips</option>
-                </select>
-              </div>
-            </div>
-
-            {duplicateWarning && (
-              <div className="rounded-lg bg-amber-50 p-3 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                <span>{duplicateWarning}</span>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700">Description & Purpose *</label>
-              <textarea
-                required
-                rows={2}
-                placeholder="What was purchased and for which rig/pier operation?"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700">Expense Date</label>
-                <input
-                  type="date"
-                  value={expenseDate}
-                  onChange={(e) => setExpenseDate(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                />
-              </div>
-
-              <div className="flex flex-col justify-center space-y-2 pt-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isOutOfPocket}
-                    onChange={(e) => setIsOutOfPocket(e.target.checked)}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span className="text-xs font-semibold text-gray-800">
-                    Paid from personal pocket (Request Reimbursement)
-                  </span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={hasPhysicalBill}
-                    onChange={(e) => setHasPhysicalBill(e.target.checked)}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span className="text-xs font-semibold text-gray-800">Physical Bill / Cash Receipt in Hand</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Bill Receipt Upload */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Upload Bill Photo / Camera Capture</label>
-              <div className="flex items-center gap-3">
-                <label className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer shadow-xs">
-                  <Camera className="h-4 w-4 text-gray-500" />
-                  <span>Choose or Capture Bill</span>
-                  <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
-                </label>
-                {isCompressing && <span className="text-xs text-indigo-600 animate-pulse">Compressing photo...</span>}
-              </div>
+              </label>
+              {isCompressing && (
+                <span className="text-xs text-accent">Compressing bill image...</span>
+              )}
               {receiptPhoto && (
-                <div className="mt-2 flex items-center justify-between p-2 rounded-lg border border-gray-200 bg-gray-50 text-xs">
-                  <span className="truncate max-w-xs font-medium text-gray-700">{receiptPhoto.name}</span>
-                  <span className="text-gray-500 text-[11px]">{formatFileSize(receiptPhoto.compressedSize)}</span>
-                  <button
-                    type="button"
-                    onClick={() => setReceiptPhoto(null)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                <span className="text-xs text-status-success font-medium">
+                  Attached: {receiptPhoto.name}
+                </span>
               )}
             </div>
+          </div>
 
-            <div className="pt-3 border-t border-gray-100 flex justify-end">
-              <button
-                type="submit"
-                disabled={isSubmitting || Boolean(deficitCapWarning?.isExceeded)}
-                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50 transition-colors cursor-pointer"
-              >
-                <PlusCircle className="h-4 w-4" />
-                <span>{isSubmitting ? 'Submitting...' : 'Submit Claim Voucher'}</span>
-              </button>
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={() => setIsExpenseModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              isLoading={isSubmitting}
+            >
+              Record Voucher
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL 2: Settle Reimbursement UTR */}
+      <Modal
+        isOpen={isSettleModalOpen}
+        onClose={() => setIsSettleModalOpen(false)}
+        title="Settle Reimbursement Disbursement"
+        description="Record banking transaction reference (UTR) for supervisor out-of-pocket payout."
+        maxWidth="md"
+      >
+        <form onSubmit={handleSettleReimbursement} className="space-y-4">
+          <div className="p-3 bg-surface-sunk/60 rounded-md border border-border space-y-1 text-xs">
+            <div className="text-text-muted">Target Voucher: #{settleTargetTx?.id}</div>
+            <div className="text-text-muted font-mono">{settleTargetTx?.description}</div>
+            <div className="font-semibold text-text font-mono text-sm pt-1">
+              Amount Due: ₹{settleTargetTx?.amount.toLocaleString('en-IN')}
             </div>
-          </form>
-        </div>
-      )}
+          </div>
 
-      {/* MODAL 1: Settle Reimbursement Modal (Finance Only) */}
-      {isSettleModalOpen && settleTargetTx && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-              <div className="flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-indigo-600" />
-                <h3 className="text-base font-bold text-gray-900">Settle Out-of-Pocket Claim</h3>
-              </div>
-              <button onClick={() => setIsSettleModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer">
-                <X className="h-5 w-5" />
-              </button>
+          <Input
+            label="Bank UTR / IMPS Reference Number"
+            required
+            value={settleUtrRef}
+            onChange={(e) => setSettleUtrRef(e.target.value)}
+            placeholder="e.g. HDFC0001239845"
+          />
+
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={() => setIsSettleModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              isLoading={isSubmitting}
+            >
+              Mark Settled
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL 3: Replenish Wallet Float */}
+      <Modal
+        isOpen={isReplenishModalOpen}
+        onClose={() => setIsReplenishModalOpen(false)}
+        title="Replenish Site Float"
+        description="Transfer commercial operating capital into Site Office Petty Cash Float."
+        maxWidth="md"
+      >
+        <form onSubmit={handleReplenishSubmit} className="space-y-4">
+          <Input
+            label="Replenishment Amount (₹)"
+            type="number"
+            required
+            value={replenishAmount}
+            onChange={(e) => setReplenishAmount(e.target.value)}
+          />
+
+          <Input
+            label="Accounting Ledger Note"
+            value={replenishDesc}
+            onChange={(e) => setReplenishDesc(e.target.value)}
+          />
+
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={() => setIsReplenishModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              isLoading={isSubmitting}
+            >
+              Disburse Float
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL 4: Out-of-Pocket Claim */}
+      <Modal
+        isOpen={isReimburseModalOpen}
+        onClose={() => setIsReimburseModalOpen(false)}
+        title="Claim Supervisor Out-of-Pocket Deficit"
+        description="Submit outstanding site deficit for commercial accounting review."
+        maxWidth="md"
+      >
+        <form onSubmit={handleReimburseSubmit} className="space-y-4">
+          <div className="p-3 bg-surface-sunk/60 rounded-md border border-border text-xs space-y-1">
+            <span className="text-text-muted">Total Outstanding Deficit:</span>
+            <div className="text-base font-semibold text-status-warning font-mono">
+              ₹{supervisorDeficit.toLocaleString('en-IN')}
             </div>
+          </div>
 
-            <form onSubmit={handleSettleReimbursement} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase">Expense Item</label>
-                <div className="text-sm font-bold text-gray-900 mt-0.5">{settleTargetTx.description}</div>
-                <div className="text-lg font-bold text-emerald-600 mt-1">₹{settleTargetTx.amount.toLocaleString()}</div>
-              </div>
+          <Input
+            label="Claim Amount (₹)"
+            type="number"
+            required
+            value={reimburseAmount}
+            onChange={(e) => setReimburseAmount(e.target.value)}
+          />
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700">Bank NEFT / UPI Reference *</label>
-                <input
-                  type="text"
-                  required
-                  value={settleUtrRef}
-                  onChange={(e) => setSettleUtrRef(e.target.value)}
-                  placeholder="e.g. UTR-988410294"
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs focus:ring-1 focus:ring-indigo-500 font-medium"
-                />
-              </div>
+          <Input
+            label="Supervisor Bank Account Note"
+            placeholder="e.g. Axis Bank A/C ending in 4102"
+            value={reimburseRef}
+            onChange={(e) => setReimburseRef(e.target.value)}
+          />
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setIsSettleModalOpen(false)}
-                  className="rounded-lg px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="rounded-lg bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-500 transition-colors cursor-pointer"
-                >
-                  {isSubmitting ? 'Settling...' : 'Confirm Settlement'}
-                </button>
-              </div>
-            </form>
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={() => setIsReimburseModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              isLoading={isSubmitting}
+            >
+              Submit Claim
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL 5: Receipt Bill Inspection */}
+      <Modal
+        isOpen={Boolean(receiptModalUrl)}
+        onClose={() => setReceiptModalUrl(null)}
+        title="Physical Bill Voucher Inspection"
+        description="Encrypted cryptographic image artifact stored for commercial audit."
+        maxWidth="lg"
+      >
+        <div className="space-y-4">
+          <div className="h-64 sm:h-80 w-full rounded-md bg-surface-sunk flex items-center justify-center border border-border overflow-hidden">
+            <div className="text-center p-6 space-y-2">
+              <Receipt className="h-10 w-10 text-accent mx-auto" />
+              <div className="font-semibold text-text text-sm">Physical Tax Invoice #4819</div>
+              <p className="text-xs text-text-muted max-w-xs">
+                M/s Malabar Diesel Spares & Hydraulics, Vadakara Bypass. Verified by Site Engineer.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => setReceiptModalUrl(null)}
+            >
+              Close Inspection
+            </Button>
           </div>
         </div>
-      )}
-
-      {/* MODAL 2: Replenish Wallet Modal (Finance Only) */}
-      {isReplenishModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-              <div className="flex items-center gap-2">
-                <ArrowUpRight className="h-5 w-5 text-emerald-600" />
-                <h3 className="text-base font-bold text-gray-900">Replenish Site Petty Cash Wallet</h3>
-              </div>
-              <button onClick={() => setIsReplenishModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleReplenishSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700">Replenishment Amount (₹) *</label>
-                <input
-                  type="number"
-                  step="100"
-                  required
-                  value={replenishAmount}
-                  onChange={(e) => setReplenishAmount(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs font-bold text-emerald-700"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700">Remarks / Transfer Details</label>
-                <input
-                  type="text"
-                  value={replenishDesc}
-                  onChange={(e) => setReplenishDesc(e.target.value)}
-                  placeholder="e.g. Bank cash withdrawal ref #9932"
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setIsReplenishModalOpen(false)}
-                  className="rounded-lg px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="rounded-lg bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors cursor-pointer"
-                >
-                  {isSubmitting ? 'Transferring...' : 'Transfer to Wallet'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: Supervisor Claim Modal */}
-      {isReimburseModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-              <div className="flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-indigo-600" />
-                <h3 className="text-base font-bold text-gray-900">Claim Reimbursement</h3>
-              </div>
-              <button onClick={() => setIsReimburseModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleReimburseSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700">Total Out-of-Pocket Deficit</label>
-                <div className="mt-1 text-2xl font-bold text-amber-600">
-                  ₹{supervisorDeficit.toLocaleString('en-IN')}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700">Claim Amount (₹) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={reimburseAmount}
-                  onChange={(e) => setReimburseAmount(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700">Reimbursement Reference No.</label>
-                <input
-                  type="text"
-                  value={reimburseRef}
-                  onChange={(e) => setReimburseRef(e.target.value)}
-                  placeholder="e.g. CLAIM-SEPT-WEEK3"
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setIsReimburseModalOpen(false)}
-                  className="rounded-lg px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="rounded-lg bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 transition-colors cursor-pointer"
-                >
-                  {isSubmitting ? 'Submitting...' : 'Submit Claim'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 4: Log Expense Modal */}
-      {isExpenseModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-              <div className="flex items-center gap-2">
-                <PlusCircle className="h-5 w-5 text-emerald-600" />
-                <h3 className="text-base font-bold text-gray-900">Record Petty Cash Expense</h3>
-              </div>
-              <button onClick={() => setIsExpenseModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleExpenseSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700">Amount (₹) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="e.g. 1500"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700">Category *</label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                  >
-                    <option value="DIESEL">Diesel</option>
-                    <option value="SPARES">Spares & Seals</option>
-                    <option value="FOOD_WATER">Food & Water</option>
-                    <option value="TRANSPORT">Transport</option>
-                    <option value="TOOLS">Tools & Hardware</option>
-                    <option value="OTHER">Other Expense</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700">Description *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Rig hydraulic O-rings"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700">Date</label>
-                  <input
-                    type="date"
-                    value={expenseDate}
-                    onChange={(e) => setExpenseDate(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                  />
-                </div>
-
-                <div className="flex flex-col justify-center space-y-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isOutOfPocket}
-                      onChange={(e) => setIsOutOfPocket(e.target.checked)}
-                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <span className="text-xs font-semibold text-gray-800">Paid Out-of-Pocket</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={hasPhysicalBill}
-                      onChange={(e) => setHasPhysicalBill(e.target.checked)}
-                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <span className="text-xs font-semibold text-gray-800">Has Physical Bill</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setIsExpenseModalOpen(false)}
-                  className="rounded-lg px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || Boolean(deficitCapWarning?.isExceeded)}
-                  className="rounded-lg bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors cursor-pointer"
-                >
-                  {isSubmitting ? 'Recording...' : 'Record Expense'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

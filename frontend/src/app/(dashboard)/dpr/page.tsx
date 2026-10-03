@@ -12,47 +12,19 @@ import {
   CloudOff,
   Camera,
   Trash2,
-  ChevronDown,
-  ChevronUp,
   ShieldCheck,
-  Check,
-  Ban,
-  Clock,
-  AlertTriangle,
-  HardHat,
   Layers,
+  ArrowRight,
+  Maximize2,
 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table';
+import { TwoPaneReviewWorkspace, ReviewDPRData } from '@/components/review/TwoPaneReviewWorkspace';
 
-interface PendingDPR {
-  id: number;
-  site_id: number;
-  site_name: string;
-  operational_date: string;
-  shift: string;
-  submitter_name: string;
-  status: 'SUBMITTED' | 'VERIFIED' | 'REJECTED';
-  piling_summary: {
-    pile_number: string;
-    diameter_mm: number;
-    depth_drilled_m: number;
-    rock_socket_m: number;
-    strata: string;
-    planned_concrete_m3: number;
-    actual_concrete_m3: number;
-    overbreak_pct: number;
-  };
-  equipment_summary: {
-    name: string;
-    hours_run: number;
-    breakdown_hours: number;
-    breakdown_reason?: string;
-  };
-  manpower_total: number;
-  delays?: string;
-  verified_at?: string;
-}
-
-const INITIAL_DPR_QUEUE: PendingDPR[] = [
+const INITIAL_DPR_QUEUE: ReviewDPRData[] = [
   {
     id: 101,
     site_id: 1,
@@ -117,6 +89,9 @@ export default function DPRPage() {
     user?.role === 'PROJECT_MANAGER' ? 'verification' : 'entry'
   );
 
+  // Active Two-Pane Review State (Section 7)
+  const [activeReviewDpr, setActiveReviewDpr] = useState<ReviewDPRData | null>(null);
+
   useEffect(() => {
     if (user?.role === 'PROJECT_MANAGER') {
       setActiveTab('verification');
@@ -126,7 +101,7 @@ export default function DPRPage() {
   }, [user?.role]);
 
   // Verification Queue State
-  const [dprQueue, setDprQueue] = useState<PendingDPR[]>(INITIAL_DPR_QUEUE);
+  const [dprQueue, setDprQueue] = useState<ReviewDPRData[]>(INITIAL_DPR_QUEUE);
 
   // General Shift State
   const [siteId, setSiteId] = useState('1');
@@ -184,11 +159,7 @@ export default function DPRPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [offlineQueuedNotice, setOfflineQueuedNotice] = useState<string | null>(null);
 
-  // Section collapse states
-  const [expandPiling, setExpandPiling] = useState(true);
-  const [expandEquipment, setExpandEquipment] = useState(true);
-
-  // Handle Photo Upload with Client-Side Canvas Compression
+  // Photo Upload Handler with Client-Side Canvas Compression
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -235,6 +206,9 @@ export default function DPRPage() {
             : d
         )
       );
+      if (activeReviewDpr && activeReviewDpr.id === dprId) {
+        setActiveReviewDpr((prev) => (prev ? { ...prev, status: 'VERIFIED' } : null));
+      }
       setSuccessToast(`DPR #${dprId} verified & signed off successfully!`);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } }; message?: string };
@@ -256,10 +230,31 @@ export default function DPRPage() {
           d.id === dprId ? { ...d, status: 'REJECTED', delays: `Revision Requested: ${reason}` } : d
         )
       );
-      setSuccessToast(`DPR #${dprId} flagged for revision.`);
+      if (activeReviewDpr && activeReviewDpr.id === dprId) {
+        setActiveReviewDpr((prev) => (prev ? { ...prev, status: 'REJECTED' } : null));
+      }
+      setSuccessToast(`DPR #${dprId} rejected & flagged for revision.`);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } }; message?: string };
       setErrorMessage(error.response?.data?.detail || 'Failed to request revision.');
+    }
+  };
+
+  // PM Flag Action
+  const handleFlagDpr = async (dprId: number, reason: string) => {
+    try {
+      await apiClient.post(`/dpr/${dprId}/verify`, {
+        status: 'REJECTED',
+        verification_notes: reason,
+      });
+      setDprQueue((prev) =>
+        prev.map((d) =>
+          d.id === dprId ? { ...d, status: 'REJECTED', delays: `Flagged: ${reason}` } : d
+        )
+      );
+      setSuccessToast(`DPR #${dprId} flagged for site clarification.`);
+    } catch (err) {
+      console.warn('Flag sync error:', err);
     }
   };
 
@@ -330,9 +325,8 @@ export default function DPRPage() {
 
     try {
       const res = await apiClient.post('/dpr', payload);
-      setSuccessToast(`DPR #${res.data?.id || 'New'} submitted successfully and queued for PM Verification!`);
-      // Add to local queue view
-      const newDpr: PendingDPR = {
+      setSuccessToast(`DPR #${res.data?.id || 'New'} recorded and submitted for PM verification!`);
+      const newDpr: ReviewDPRData = {
         id: res.data?.id || 102,
         site_id: parseInt(siteId, 10),
         site_name: 'Vadakara AVRP Flyover Package',
@@ -372,7 +366,7 @@ export default function DPRPage() {
     } catch (err: unknown) {
       if (isOfflineQueued(err)) {
         setOfflineQueuedNotice(
-          `DPR for ${pileNumber} recorded offline on this device! Stored in IndexedDB and will auto-sync upon reconnection.`
+          `DPR for ${pileNumber} recorded in offline buffer! Will auto-sync when network returns.`
         );
       } else {
         const error = err as { response?: { data?: { detail?: string } }; message?: string };
@@ -386,104 +380,126 @@ export default function DPRPage() {
 
   const pendingVerificationCount = dprQueue.filter((d) => d.status === 'SUBMITTED').length;
 
+  // If active two-pane review workspace is currently open for a DPR, render it full view!
+  if (activeReviewDpr) {
+    return (
+      <TwoPaneReviewWorkspace
+        dpr={activeReviewDpr}
+        onApprove={handleVerifyDpr}
+        onReject={handleRejectDpr}
+        onFlag={handleFlagDpr}
+        onBackToList={() => setActiveReviewDpr(null)}
+      />
+    );
+  }
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6 sm:px-6 lg:px-8 space-y-6">
-      {/* Top Banner Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-xs">
+    <div className="max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8 space-y-6 select-none font-sans">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface p-6 rounded-lg border border-border shadow-soft">
         <div>
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-              <HardHat className="h-6 w-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Daily Progress Report (DPR)</h1>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-700 border">
-                  {user?.role?.replace('_', ' ') || 'Field Operations'}
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-gray-500">
-                {isPMOrOwner
-                  ? 'Project Manager Verification Center: Audit concrete overbreak, rig downtime, and verify reports'
-                  : 'Site Engineer Workstation: Complete daily piling, equipment runtime, and delay logs'}
-              </p>
-            </div>
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-text">
+              Daily Progress Report (DPR)
+            </h1>
+            <Badge variant="accent" size="sm">
+              {user?.role?.replace('_', ' ') || 'Site Ops'}
+            </Badge>
           </div>
+          <p className="text-xs text-text-muted mt-1 leading-relaxed">
+            {isPMOrOwner
+              ? 'Human-in-the-Loop Review Center: Verify pile boring telemetry, check concrete overbreak ratios, and validate rig downtime.'
+              : 'Site Engineer Workstation: Complete piling progress, equipment telematics, and delay documentation.'}
+          </p>
         </div>
+
+        {isPMOrOwner && pendingVerificationCount > 0 && (
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => setActiveReviewDpr(dprQueue[0])}
+            leftIcon={<Maximize2 className="h-4 w-4" />}
+          >
+            Open Next in AI Review Workspace
+          </Button>
+        )}
       </div>
 
-      {/* Role Navigation Tabs */}
-      <div className="flex border-b border-gray-200 bg-white px-4 rounded-t-xl">
+      {/* Navigation Tabs */}
+      <div className="flex border-b border-border bg-surface px-4 rounded-t-lg">
         {isPMOrOwner && (
           <button
+            type="button"
             onClick={() => setActiveTab('verification')}
-            className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-bold transition-colors cursor-pointer ${
+            className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-semibold transition-colors cursor-pointer ${
               activeTab === 'verification'
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-text-muted hover:text-text'
             }`}
           >
             <ShieldCheck className="h-4 w-4" />
-            <span>PM Verification Queue</span>
+            <span>Verification Queue</span>
             {pendingVerificationCount > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800 font-bold">
+              <Badge variant="warning" size="sm">
                 {pendingVerificationCount}
-              </span>
+              </Badge>
             )}
           </button>
         )}
 
         <button
+          type="button"
           onClick={() => setActiveTab('entry')}
-          className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-bold transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-semibold transition-colors cursor-pointer ${
             activeTab === 'entry'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-text-muted hover:text-text'
           }`}
         >
           <FileText className="h-4 w-4" />
-          <span>{isPMOrOwner ? 'Technical Form Preview' : 'New DPR Entry'}</span>
+          <span>{isPMOrOwner ? 'Technical Entry Preview' : 'New DPR Entry'}</span>
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveTab('history')}
-          className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-bold transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-semibold transition-colors cursor-pointer ${
             activeTab === 'history'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-text-muted hover:text-text'
           }`}
         >
           <Layers className="h-4 w-4" />
-          <span>DPR History & Sign-Offs</span>
+          <span>DPR History & Logs</span>
         </button>
       </div>
 
       {/* Notifications */}
       {successToast && (
-        <div className="rounded-lg bg-green-50 p-4 border border-green-200 flex items-start gap-3 shadow-xs">
-          <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
-          <div className="flex-1 text-xs font-semibold text-green-900">{successToast}</div>
-          <button onClick={() => setSuccessToast(null)} className="text-xs text-green-800 hover:underline cursor-pointer">
+        <div className="rounded-md bg-status-success-soft p-4 border border-status-success/20 flex items-start gap-3 shadow-soft animate-in fade-in duration-fast">
+          <CheckCircle2 className="h-4 w-4 text-status-success shrink-0 mt-0.5" />
+          <div className="flex-1 text-xs font-medium text-status-success leading-tight">{successToast}</div>
+          <button onClick={() => setSuccessToast(null)} className="text-xs text-status-success hover:underline">
             Dismiss
           </button>
         </div>
       )}
 
       {offlineQueuedNotice && (
-        <div className="rounded-lg bg-amber-50 p-4 border border-amber-200 flex items-start gap-3 shadow-xs">
-          <CloudOff className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-          <div className="flex-1 text-xs font-medium text-amber-900">{offlineQueuedNotice}</div>
-          <button onClick={() => setOfflineQueuedNotice(null)} className="text-xs text-amber-800 hover:underline cursor-pointer">
+        <div className="rounded-md bg-status-warning-soft p-4 border border-status-warning/20 flex items-start gap-3 shadow-soft">
+          <CloudOff className="h-4 w-4 text-status-warning shrink-0 mt-0.5" />
+          <div className="flex-1 text-xs font-medium text-status-warning leading-tight">{offlineQueuedNotice}</div>
+          <button onClick={() => setOfflineQueuedNotice(null)} className="text-xs text-status-warning hover:underline">
             Dismiss
           </button>
         </div>
       )}
 
       {errorMessage && (
-        <div className="rounded-lg bg-red-50 p-4 border border-red-200 flex items-start gap-3 shadow-xs">
-          <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-          <div className="flex-1 text-xs font-semibold text-red-900">{errorMessage}</div>
-          <button onClick={() => setErrorMessage(null)} className="text-xs text-red-800 hover:underline cursor-pointer">
+        <div className="rounded-md bg-status-danger-soft p-4 border border-status-danger/20 flex items-start gap-3 shadow-soft">
+          <AlertCircle className="h-4 w-4 text-status-danger shrink-0 mt-0.5" />
+          <div className="flex-1 text-xs font-medium text-status-danger leading-tight">{errorMessage}</div>
+          <button onClick={() => setErrorMessage(null)} className="text-xs text-status-danger hover:underline">
             Dismiss
           </button>
         </div>
@@ -492,140 +508,108 @@ export default function DPRPage() {
       {/* TAB 1: PM Verification Queue (For Project Manager & Owner) */}
       {isPMOrOwner && activeTab === 'verification' && (
         <div className="space-y-4">
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <span>DPR Review & Verification Queue</span>
-                <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  {pendingVerificationCount} awaiting sign-off
-                </span>
-              </h2>
-              <p className="text-xs text-gray-500">
-                Inspect technical boring depth, calculate concrete overbreak against theoretical cylinder, and approve or reject.
-              </p>
-            </div>
+          <div className="flex items-center justify-between pb-1">
+            <h2 className="text-sm font-semibold text-text uppercase tracking-wider">
+              Pending Operational Reviews ({pendingVerificationCount})
+            </h2>
+            <span className="text-xs text-text-faint">
+              Click any report to launch the Two-Pane Review Instrument
+            </span>
           </div>
 
-          {dprQueue.map((item) => (
-            <div
-              key={item.id}
-              className={`bg-white rounded-xl border p-5 shadow-xs space-y-4 transition-all ${
-                item.status === 'VERIFIED' ? 'border-emerald-200 bg-emerald-50/20' : 'border-gray-200'
-              }`}
-            >
-              {/* Card Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-900 text-sm">DPR #{item.id}</span>
-                    <span className="text-xs text-gray-500">• {item.site_name}</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700">
-                      {item.shift} SHIFT
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    Submitted by <span className="font-semibold text-gray-700">{item.submitter_name}</span> on{' '}
-                    {item.operational_date}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                      item.status === 'VERIFIED'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : item.status === 'REJECTED'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-amber-100 text-amber-800'
-                    }`}
-                  >
-                    {item.status}
-                  </span>
-                </div>
-              </div>
-
-              {/* Technical Details Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                {/* Piling Boring */}
-                <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                  <div className="font-bold text-gray-800 mb-1 flex items-center gap-1.5">
-                    <HardHat className="h-3.5 w-3.5 text-indigo-600" />
-                    <span>Piling: {item.piling_summary.pile_number}</span>
-                  </div>
-                  <div className="space-y-1 text-gray-600">
-                    <div>Drilled Today: <span className="font-bold text-gray-900">{item.piling_summary.depth_drilled_m}m</span> (Socket: {item.piling_summary.rock_socket_m}m)</div>
-                    <div>Strata: <span className="font-semibold text-gray-800">{item.piling_summary.strata}</span></div>
-                    <div>Diameter: {item.piling_summary.diameter_mm} mm</div>
-                  </div>
-                </div>
-
-                {/* Concrete Overbreak Guard */}
-                <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                  <div className="font-bold text-gray-800 mb-1 flex items-center gap-1.5">
-                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                    <span>Concrete Overbreak</span>
-                  </div>
-                  <div className="space-y-1 text-gray-600">
-                    <div>Planned: {item.piling_summary.planned_concrete_m3} m³</div>
-                    <div>Actual Poured: <span className="font-bold text-gray-900">{item.piling_summary.actual_concrete_m3} m³</span></div>
-                    <div className="flex items-center gap-1">
-                      <span>Variance:</span>
-                      <span className="font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
-                        +{item.piling_summary.overbreak_pct}%
+          <div className="space-y-4">
+            {dprQueue.map((item) => (
+              <Card
+                key={item.id}
+                padding="md"
+                isInteractive
+                onClick={() => setActiveReviewDpr(item)}
+                className={
+                  item.status === 'VERIFIED'
+                    ? 'border-status-success/30 bg-surface'
+                    : 'border-border bg-surface'
+                }
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-text text-sm">
+                        DPR #{item.id} — {item.piling_summary.pile_number}
                       </span>
-                      <span className="text-[10px] text-gray-400">(Tolerance &lt;15%)</span>
+                      <Badge variant="accent" size="sm">
+                        {item.shift} SHIFT
+                      </Badge>
+                      <Badge
+                        variant={
+                          item.status === 'VERIFIED'
+                            ? 'verified'
+                            : item.status === 'REJECTED'
+                            ? 'danger'
+                            : 'warning'
+                        }
+                        size="sm"
+                      >
+                        {item.status}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-text-muted mt-0.5">
+                      {item.site_name} • Submitted by {item.submitter_name} on {item.operational_date}
                     </div>
                   </div>
+
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveReviewDpr(item);
+                    }}
+                    rightIcon={<ArrowRight className="h-3.5 w-3.5" />}
+                  >
+                    Open in Review Workspace
+                  </Button>
                 </div>
 
-                {/* Equipment & Delays */}
-                <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                  <div className="font-bold text-gray-800 mb-1 flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-blue-600" />
-                    <span>Rig Runtime & Delays</span>
-                  </div>
-                  <div className="space-y-1 text-gray-600">
-                    <div>{item.equipment_summary.name}</div>
-                    <div>Run: {item.equipment_summary.hours_run}h | Downtime: {item.equipment_summary.breakdown_hours}h</div>
-                    {item.delays && <div className="text-[11px] text-amber-700 truncate font-medium">{item.delays}</div>}
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons for PM */}
-              <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                <div className="text-xs text-gray-500 font-medium">
-                  {item.verified_at ? (
-                    <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                      <Check className="h-3.5 w-3.5" />
-                      {item.verified_at}
+                {/* Technical Overview Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 text-xs">
+                  <div className="p-3 bg-surface-sunk/60 rounded-md">
+                    <span className="text-[10px] text-text-faint block uppercase tracking-wider">Boring Depth</span>
+                    <span className="font-semibold text-text font-mono">
+                      {item.piling_summary.depth_drilled_m}m drilled (Socket: {item.piling_summary.rock_socket_m}m)
                     </span>
-                  ) : (
-                    <span>Pending review by Project Manager</span>
-                  )}
-                </div>
-
-                {item.status === 'SUBMITTED' && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleRejectDpr(item.id)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 border border-red-200 bg-red-50 text-red-700 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors cursor-pointer"
-                    >
-                      <Ban className="h-3.5 w-3.5" />
-                      <span>Request Revision</span>
-                    </button>
-                    <button
-                      onClick={() => handleVerifyDpr(item.id)}
-                      className="inline-flex items-center gap-1 px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors shadow-xs cursor-pointer"
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                      <span>Verify & Sign Off</span>
-                    </button>
+                    <span className="block text-[11px] text-text-muted mt-0.5">
+                      Strata: {item.piling_summary.strata}
+                    </span>
                   </div>
-                )}
-              </div>
-            </div>
-          ))}
+
+                  <div className="p-3 bg-surface-sunk/60 rounded-md">
+                    <span className="text-[10px] text-text-faint block uppercase tracking-wider">Concrete Overbreak</span>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="font-bold text-status-warning font-mono">
+                        +{item.piling_summary.overbreak_pct}%
+                      </span>
+                      <span className="text-[10px] text-text-faint">
+                        ({item.piling_summary.actual_concrete_m3} / {item.piling_summary.planned_concrete_m3} m³)
+                      </span>
+                    </div>
+                    <span className="block text-[11px] text-text-muted mt-0.5">
+                      Tolerance threshold &lt;15%
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-surface-sunk/60 rounded-md">
+                    <span className="text-[10px] text-text-faint block uppercase tracking-wider">Rig Runtime</span>
+                    <span className="font-semibold text-text font-mono">
+                      {item.equipment_summary.hours_run} hrs (Downtime: {item.equipment_summary.breakdown_hours}h)
+                    </span>
+                    <span className="block text-[11px] text-text-muted truncate mt-0.5">
+                      {item.equipment_summary.name}
+                    </span>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
 
@@ -633,357 +617,341 @@ export default function DPRPage() {
       {(activeTab === 'entry' || !isPMOrOwner) && (
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Section 1: Shift Header */}
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">1</span>
-              Shift & Site Header
-            </h2>
+          <Card padding="md">
+            <CardHeader>
+              <CardTitle>1. Shift & Site Context</CardTitle>
+              <CardDescription>Primary site parameters and operational conditions.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-text-muted mb-1.5">
+                    Project / Site
+                  </label>
+                  <select
+                    value={siteId}
+                    onChange={(e) => setSiteId(e.target.value)}
+                    className="w-full bg-surface-sunk border border-border rounded-md text-xs sm:text-sm py-2 px-3 text-text focus:outline-none focus:border-accent"
+                  >
+                    <option value="1">ADANI-ODIPKS AVRP Flyover (Site #1)</option>
+                  </select>
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700">Project / Site</label>
-                <select
-                  value={siteId}
-                  onChange={(e) => setSiteId(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="1">ADANI-ODIPKS AVRP Flyover (Site #1)</option>
-                  <option value="2">Vadakara Bypass Bridge Package (Site #2)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700">Operational Date</label>
-                <input
+                <Input
+                  label="Operational Date"
                   type="date"
                   value={operationalDate}
                   onChange={(e) => setOperationalDate(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                />
+
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-text-muted mb-1.5">
+                    Shift Mode
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShift('DAY')}
+                      className={`flex-1 py-2 text-xs font-medium rounded-pill border transition-all ${
+                        shift === 'DAY'
+                          ? 'bg-accent text-accent-contrast border-accent'
+                          : 'bg-surface-sunk text-text-muted border-border hover:bg-surface'
+                      }`}
+                    >
+                      Day Shift
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShift('NIGHT')}
+                      className={`flex-1 py-2 text-xs font-medium rounded-pill border transition-all ${
+                        shift === 'NIGHT'
+                          ? 'bg-accent text-accent-contrast border-accent'
+                          : 'bg-surface-sunk text-text-muted border-border hover:bg-surface'
+                      }`}
+                    >
+                      Night Shift
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-text-muted mb-1.5">
+                    Weather State
+                  </label>
+                  <select
+                    value={weather}
+                    onChange={(e) => setWeather(e.target.value)}
+                    className="w-full bg-surface-sunk border border-border rounded-md text-xs sm:text-sm py-2 px-3 text-text focus:outline-none focus:border-accent"
+                  >
+                    <option value="SUNNY">Clear / Sunny</option>
+                    <option value="OVERCAST">Overcast</option>
+                    <option value="LIGHT_RAIN">Light Rain (No Stoppage)</option>
+                    <option value="HEAVY_RAIN">Heavy Monsoonal Rain</option>
+                  </select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Section 2: Piling Parameters */}
+          <Card padding="md">
+            <CardHeader>
+              <CardTitle>2. Bored Piling Execution & Overbreak</CardTitle>
+              <CardDescription>Boring telemetry, rock socketing, and transit mixer volume.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Input
+                  label="Pile Identifier"
+                  value={pileNumber}
+                  onChange={(e) => setPileNumber(e.target.value)}
+                  placeholder="e.g. P-104 (Pier P12)"
+                />
+                <Input
+                  label="Diameter (mm)"
+                  type="number"
+                  value={diameterMm}
+                  onChange={(e) => setDiameterMm(e.target.value)}
+                />
+                <Input
+                  label="Depth Drilled (m)"
+                  type="number"
+                  step="0.1"
+                  value={drilledDepth}
+                  onChange={(e) => setDrilledDepth(e.target.value)}
+                />
+                <Input
+                  label="Rock Socket (m)"
+                  type="number"
+                  step="0.1"
+                  value={rockSocketDepth}
+                  onChange={(e) => setRockSocketDepth(e.target.value)}
+                />
+
+                <Input
+                  label="Planned Concrete (m³)"
+                  type="number"
+                  step="0.1"
+                  value={plannedConcreteM3}
+                  onChange={(e) => setPlannedConcreteM3(e.target.value)}
+                />
+                <Input
+                  label="Actual Poured (m³)"
+                  type="number"
+                  step="0.1"
+                  value={actualConcreteM3}
+                  onChange={(e) => setActualConcreteM3(e.target.value)}
+                />
+
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-text-muted mb-1.5">
+                    Strata Classification
+                  </label>
+                  <select
+                    value={strataType}
+                    onChange={(e) => setStrataType(e.target.value)}
+                    className="w-full bg-surface-sunk border border-border rounded-md text-xs sm:text-sm py-2 px-3 text-text focus:outline-none focus:border-accent"
+                  >
+                    <option value="SOFT_CLAY">Soft Coastal Clay / Alluvium</option>
+                    <option value="WEATHERED_ROCK">Weathered Gneiss / Soft Rock</option>
+                    <option value="HARD_ROCK">Massive Hard Rock (Granite / Basalt)</option>
+                  </select>
+                </div>
+
+                <div className="p-3 bg-surface-sunk/60 rounded-md border border-border flex flex-col justify-center">
+                  <span className="text-[10px] text-text-faint uppercase tracking-wider">Calculated Overbreak</span>
+                  <div className="font-mono text-base font-bold text-status-warning mt-0.5">
+                    +
+                    {Math.round(
+                      ((parseFloat(actualConcreteM3) - parseFloat(plannedConcreteM3)) /
+                        (parseFloat(plannedConcreteM3) || 1)) *
+                        1000
+                    ) / 10}
+                    %
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Section 3: Equipment Telematics */}
+          <Card padding="md">
+            <CardHeader>
+              <CardTitle>3. Heavy Equipment Telematics</CardTitle>
+              <CardDescription>Machinery operating hours, breakdown logs, and diesel fuel issued.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Input
+                  label="Equipment Rig Name"
+                  value={equipmentName}
+                  onChange={(e) => setEquipmentName(e.target.value)}
+                />
+                <Input
+                  label="Hours Run (h)"
+                  type="number"
+                  step="0.1"
+                  value={hoursOperated}
+                  onChange={(e) => setHoursOperated(e.target.value)}
+                />
+                <Input
+                  label="Breakdown Loss (h)"
+                  type="number"
+                  step="0.1"
+                  value={breakdownHours}
+                  onChange={(e) => setBreakdownHours(e.target.value)}
+                />
+                <Input
+                  label="Diesel Consumed (L)"
+                  type="number"
+                  value={fuelLiters}
+                  onChange={(e) => setFuelLiters(e.target.value)}
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700">Shift</label>
-                <div className="mt-1 grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShift('DAY')}
-                    className={`py-2 text-xs font-semibold rounded-lg border transition-colors ${
-                      shift === 'DAY'
-                        ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                        : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    Day Shift
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShift('NIGHT')}
-                    className={`py-2 text-xs font-semibold rounded-lg border transition-colors ${
-                      shift === 'NIGHT'
-                        ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                        : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    Night Shift
-                  </button>
+              {parseFloat(breakdownHours) > 0 && (
+                <div className="mt-4">
+                  <Input
+                    label="Breakdown Mechanical Diagnosis"
+                    value={breakdownReason}
+                    onChange={(e) => setBreakdownReason(e.target.value)}
+                    placeholder="Specify cause (e.g. hydraulic hose leak, winch rope replaced)"
+                  />
                 </div>
-              </div>
+              )}
+            </CardContent>
+          </Card>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700">Weather Condition</label>
-                <select
-                  value={weather}
-                  onChange={(e) => setWeather(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="SUNNY">Sunny / Clear Sky</option>
-                  <option value="OVERCAST">Overcast / Cloudy</option>
-                  <option value="LIGHT_RAIN">Light Rain / Intermittent</option>
-                  <option value="HEAVY_RAIN">Heavy Monsoonal Downpour</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Piling Boring & Concreting */}
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-4">
-            <div className="flex items-center justify-between cursor-pointer" onClick={() => setExpandPiling(!expandPiling)}>
-              <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">2</span>
-                Piling Boring & Concreting Log
-              </h2>
-              {expandPiling ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
-            </div>
-
-            {expandPiling && (
-              <div className="space-y-4 pt-2 border-t border-gray-100">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700">Pile ID / Pier Location</label>
-                    <input
-                      type="text"
-                      value={pileNumber}
-                      onChange={(e) => setPileNumber(e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700">Pile Diameter (mm) *</label>
-                    <input
-                      type="number"
-                      required
-                      min="400"
-                      value={diameterMm}
-                      onChange={(e) => setDiameterMm(e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs font-semibold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700">Strata Encountered</label>
-                    <select
-                      value={strataType}
-                      onChange={(e) => setStrataType(e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                    >
-                      <option value="SOIL">Top Soil / Alluvial Clay</option>
-                      <option value="CLAY">Stiff Clay</option>
-                      <option value="SAND">Medium Dense Sand</option>
-                      <option value="WEATHERED_ROCK">Weathered Sedimentary Rock</option>
-                      <option value="HARD_ROCK">Hard Granite Rock Core</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700">Drilled Depth Today (m) *</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      required
-                      value={drilledDepth}
-                      onChange={(e) => setDrilledDepth(e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs font-semibold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700">Rock Socket Depth (m)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={rockSocketDepth}
-                      onChange={(e) => setRockSocketDepth(e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700">Planned Concrete (m³)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={plannedConcreteM3}
-                      onChange={(e) => setPlannedConcreteM3(e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700">Actual Poured (m³) *</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      required
-                      value={actualConcreteM3}
-                      onChange={(e) => setActualConcreteM3(e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs font-bold text-gray-900"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Section 3: Equipment & Rig Run Hours */}
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-4">
-            <div className="flex items-center justify-between cursor-pointer" onClick={() => setExpandEquipment(!expandEquipment)}>
-              <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">3</span>
-                Equipment Utilization & Breakdown Log
-              </h2>
-              {expandEquipment ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
-            </div>
-
-            {expandEquipment && (
-              <div className="space-y-4 pt-2 border-t border-gray-100">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700">Equipment Name</label>
-                    <input
-                      type="text"
-                      value={equipmentName}
-                      onChange={(e) => setEquipmentName(e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700">Hours Operated (h)</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      value={hoursOperated}
-                      onChange={(e) => setHoursOperated(e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700">Breakdown (h)</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      value={breakdownHours}
-                      onChange={(e) => setBreakdownHours(e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs text-red-600 font-semibold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700">Diesel Issued (Liters)</label>
-                    <input
-                      type="number"
-                      value={fuelLiters}
-                      onChange={(e) => setFuelLiters(e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-xs"
-                    />
-                  </div>
-                </div>
-
-                {parseFloat(breakdownHours) > 0 && (
-                  <div>
-                    <label className="block text-xs font-medium text-red-700">Breakdown Reason & Mechanic Action</label>
-                    <input
-                      type="text"
-                      value={breakdownReason}
-                      onChange={(e) => setBreakdownReason(e.target.value)}
-                      placeholder="e.g. Hydraulic pressure hose leak - replaced O-ring"
-                      className="mt-1 block w-full rounded-lg border border-red-300 bg-red-50/50 px-3 py-2 text-sm shadow-xs text-red-900"
-                    />
-                  </div>
+          {/* Section 4: Site Photos & Verification Documents */}
+          <Card padding="md">
+            <CardHeader>
+              <CardTitle>4. Photographic Evidence & Pour Slips</CardTitle>
+              <CardDescription>Photos compressed locally in-browser for bandwidth-optimized upload.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4">
+                <label className="cursor-pointer">
+                  <span className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-pill bg-accent-soft text-accent border border-accent/20 hover:bg-accent/20 transition-colors">
+                    <Camera className="h-4 w-4" />
+                    <span>Attach Site Photos</span>
+                  </span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                  />
+                </label>
+                {isCompressing && (
+                  <span className="text-xs text-accent">Compressing images locally...</span>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Section 4: Photo Attachments with Canvas Compression */}
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">4</span>
-              Site Photos (Progress & Spoil Inspection)
-            </h2>
+              {photos.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {photos.map((p, idx) => (
+                    <div key={idx} className="relative rounded-md overflow-hidden border border-border group bg-surface-sunk">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p.dataUrl} alt={p.name} className="h-24 w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(idx)}
+                        className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-pill hover:bg-red-600 transition-colors"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-            <div className="flex items-center gap-4">
-              <label className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold rounded-lg cursor-pointer hover:bg-indigo-100 transition-colors shadow-xs">
-                <Camera className="h-4 w-4" />
-                <span>Upload Photos</span>
-                <input type="file" multiple accept="image/*" onChange={handlePhotoUpload} className="hidden" />
-              </label>
-              {isCompressing && <span className="text-xs text-indigo-600 animate-pulse">Compressing high-res photos...</span>}
-            </div>
-
-            {photos.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                {photos.map((p, idx) => (
-                  <div key={idx} className="relative group border rounded-lg overflow-hidden bg-gray-100 aspect-video">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.dataUrl} alt={p.name} className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(idx)}
-                      className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded hover:bg-red-600 transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Submit Button */}
-          <div className="flex justify-end pt-2">
-            <button
+          {/* Submission Bar */}
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
               type="submit"
-              disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white text-sm font-bold rounded-lg shadow-xs hover:bg-indigo-700 disabled:opacity-50 transition-colors cursor-pointer"
+              variant="primary"
+              size="lg"
+              isLoading={isSubmitting}
+              rightIcon={<Send className="h-4 w-4" />}
             >
-              <Send className="h-4 w-4" />
-              <span>{isSubmitting ? 'Submitting DPR...' : 'Submit DPR for Verification'}</span>
-            </button>
+              {isSubmitting ? 'Recording...' : 'Submit DPR for PM Verification'}
+            </Button>
           </div>
         </form>
       )}
 
-      {/* TAB 3: DPR History */}
+      {/* TAB 3: DPR History & Audit Log */}
       {activeTab === 'history' && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-gray-100">
-            <h2 className="text-base font-bold text-gray-900">Historical DPR Submissions</h2>
-            <p className="text-xs text-gray-500">Record of daily progress reports and their verification status</p>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-left text-xs">
-              <thead className="bg-gray-50 text-gray-500 font-semibold uppercase">
-                <tr>
-                  <th className="px-4 py-3">ID</th>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Shift</th>
-                  <th className="px-4 py-3">Pile / Pier</th>
-                  <th className="px-4 py-3">Drilled (m)</th>
-                  <th className="px-4 py-3">Concrete (m³)</th>
-                  <th className="px-4 py-3 text-center">Status</th>
-                  <th className="px-4 py-3 text-right">Sign-Off</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
+        <Card padding="md">
+          <CardHeader>
+            <CardTitle>Historical DPR Logs & Audit Sign-Offs</CardTitle>
+            <CardDescription>Immutable record of all daily engineering reports filed for this project package.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>DPR ID</TableHead>
+                  <TableHead>Date & Shift</TableHead>
+                  <TableHead>Pile Ref</TableHead>
+                  <TableHead>Drilled Depth</TableHead>
+                  <TableHead>Overbreak</TableHead>
+                  <TableHead>Rig Hours</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead align="right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {dprQueue.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50/70">
-                    <td className="px-4 py-3 font-bold text-gray-900">#{item.id}</td>
-                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{item.operational_date}</td>
-                    <td className="px-4 py-3 font-semibold text-gray-800">{item.shift}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900">{item.piling_summary.pile_number}</td>
-                    <td className="px-4 py-3 text-gray-800 font-bold">{item.piling_summary.depth_drilled_m}m</td>
-                    <td className="px-4 py-3 text-gray-800 font-bold">
-                      {item.piling_summary.actual_concrete_m3} m³
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  <TableRow key={item.id} isClickable onClick={() => setActiveReviewDpr(item)}>
+                    <TableCell isNumeric>#{item.id}</TableCell>
+                    <TableCell>
+                      <span className="font-mono text-xs">{item.operational_date}</span>{' '}
+                      <span className="text-text-faint text-[11px]">({item.shift})</span>
+                    </TableCell>
+                    <TableCell>{item.piling_summary.pile_number}</TableCell>
+                    <TableCell isNumeric>{item.piling_summary.depth_drilled_m} m</TableCell>
+                    <TableCell isNumeric>
+                      <span className="font-semibold text-status-warning">
+                        +{item.piling_summary.overbreak_pct}%
+                      </span>
+                    </TableCell>
+                    <TableCell isNumeric>{item.equipment_summary.hours_run} hrs</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
                           item.status === 'VERIFIED'
-                            ? 'bg-emerald-100 text-emerald-800'
+                            ? 'verified'
                             : item.status === 'REJECTED'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}
+                            ? 'danger'
+                            : 'warning'
+                        }
+                        size="sm"
                       >
                         {item.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right text-gray-500">
-                      {item.verified_at || 'Pending PM Verification'}
-                    </td>
-                  </tr>
+                      </Badge>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveReviewDpr(item);
+                        }}
+                      >
+                        Review
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

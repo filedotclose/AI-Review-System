@@ -3,18 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '@/lib/api-client';
 import {
-  LayoutDashboard,
   Calendar,
   Sparkles,
   Copy,
   Check,
   AlertTriangle,
-  CheckCircle2,
   MessageSquare,
   RefreshCw,
   TrendingUp,
   Layers,
 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Toast } from '@/components/ui/Toast';
 
 interface AlertItem {
   severity: 'WARNING' | 'CRITICAL' | 'INFO';
@@ -132,15 +134,14 @@ export default function ExecutiveBriefPage() {
           setAlerts(mappedAlerts);
         }
       }
-      setToastMessage('Executive Brief generated and simulated dispatch sent via WhatsApp & Email!');
+      setToastMessage('Executive Brief generated and simulated dispatch sent via WhatsApp & Email.');
     } catch (err: unknown) {
       console.warn('Brief generation error:', err);
-      // Simulated generation success for local demo
       setPilingMeters(38.2);
       setPilesCompleted(2);
       setEquipmentUptimePct(94.0);
       setTotalManpower(48);
-      setToastMessage('Executive Brief generated from latest DPRs, Fuel, and Attendance registers!');
+      setToastMessage('Executive Brief aggregated from latest DPRs, Fuel, and Attendance registers.');
     } finally {
       setIsGenerating(false);
     }
@@ -177,224 +178,265 @@ ${alerts.map((a) => `• [${a.severity}] ${a.title}: ${a.description}`).join('\n
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+    <div className="max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8 space-y-6 select-none font-sans">
+      {/* Toast Alert */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          type="success"
+          onDismiss={() => setToastMessage(null)}
+        />
+      )}
+
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface p-6 rounded-lg border border-border shadow-soft">
+        <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-              <LayoutDashboard className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Executive Daily Brief</h1>
-              <p className="text-xs sm:text-sm text-gray-500">Automated 8:00 AM IST Executive Scorecard & WhatsApp Dispatch</p>
-            </div>
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-text">
+              Executive Daily Scorecard
+            </h1>
+            <Badge variant="ai" size="sm">
+              AI Aggregated
+            </Badge>
           </div>
+          <p className="text-xs text-text-muted leading-relaxed">
+            Automated 8:00 AM IST Multi-Source Synthesis & Executive Dispatch
+          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 shadow-sm">
-            <Calendar className="h-4 w-4 text-gray-400" />
+        {/* Date Selector & Generator */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-2 bg-surface-sunk border border-border rounded-md px-3 py-1.5 shadow-soft">
+            <Calendar className="h-4 w-4 text-text-faint" />
             <input
               type="date"
               value={operationalDate}
               onChange={(e) => setOperationalDate(e.target.value)}
-              className="text-xs font-semibold text-gray-700 focus:outline-none"
+              className="bg-transparent text-xs font-medium text-text focus:outline-none"
             />
             <button
               type="button"
               onClick={() => loadBrief(operationalDate)}
               disabled={isLoading}
-              title="Refresh brief"
-              className="ml-1 p-0.5 text-gray-400 hover:text-gray-600"
+              title="Refresh Brief"
+              className="p-1 text-text-faint hover:text-text rounded transition-colors"
             >
-              <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin text-indigo-600' : ''}`} />
+              <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin text-accent' : ''}`} />
             </button>
           </div>
 
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="md"
             onClick={handleGenerateBrief}
-            disabled={isGenerating}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50 transition-colors cursor-pointer"
+            isLoading={isGenerating}
+            leftIcon={<Sparkles className="h-4 w-4" />}
           >
-            <Sparkles className={`h-3.5 w-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
-            <span>{isGenerating ? 'Aggregating...' : 'Generate Brief Now'}</span>
-          </button>
+            {isGenerating ? 'Synthesizing...' : 'Generate Morning Brief'}
+          </Button>
         </div>
       </div>
 
-      {/* Notification Toast */}
-      {toastMessage && (
-        <div className="rounded-lg bg-green-50 p-4 border border-green-200 flex items-start gap-3 shadow-sm">
-          <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-          <div className="flex-1 text-xs font-medium text-green-900">{toastMessage}</div>
-          <button
-            onClick={() => setToastMessage(null)}
-            className="text-xs font-semibold text-green-700 hover:underline"
-          >
-            Dismiss
-          </button>
+      {/* Metric Scorecard Grid (Precision Instrument Panel) */}
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3.5">
+        {/* Metric 1: Drilled Depth */}
+        <div className="bg-surface p-4 rounded-lg border border-border shadow-soft space-y-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+            Drilled Depth
+          </span>
+          <div className="text-xl sm:text-2xl font-semibold text-text font-mono tabular-nums">
+            {pilingMeters} <span className="text-sm font-sans font-normal text-text-muted">m</span>
+          </div>
+          <div className="flex items-center gap-1 text-[11px] text-status-success font-medium">
+            <TrendingUp className="h-3 w-3" />
+            <span>Day + Night</span>
+          </div>
         </div>
-      )}
 
-      {/* Metric Scorecards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-        {/* Linear Meters */}
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm col-span-1 lg:col-span-1">
-          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Drilled Depth</span>
-          <div className="mt-1 text-xl sm:text-2xl font-bold text-gray-900">{pilingMeters} m</div>
-          <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5 mt-0.5">
-            <TrendingUp className="h-3 w-3" /> Day + Night
+        {/* Metric 2: Piles Completed */}
+        <div className="bg-surface p-4 rounded-lg border border-border shadow-soft space-y-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+            Piles Cast
+          </span>
+          <div className="text-xl sm:text-2xl font-semibold text-accent font-mono tabular-nums">
+            {pilesCompleted} <span className="text-sm font-sans font-normal text-text-muted">Piles</span>
+          </div>
+          <span className="text-[11px] text-text-faint truncate block">
+            Pier P12 #3, #4
           </span>
         </div>
 
-        {/* Piles Completed */}
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm col-span-1 lg:col-span-1">
-          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Piles Cast</span>
-          <div className="mt-1 text-xl sm:text-2xl font-bold text-indigo-600">{pilesCompleted} Piles</div>
-          <span className="text-[10px] text-gray-500 font-medium mt-0.5 block">Pier P12 #3, #4</span>
+        {/* Metric 3: Rig Uptime */}
+        <div className="bg-surface p-4 rounded-lg border border-border shadow-soft space-y-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+            Rig Uptime
+          </span>
+          <div className="text-xl sm:text-2xl font-semibold text-status-success font-mono tabular-nums">
+            {equipmentUptimePct}<span className="text-sm font-sans font-normal">%</span>
+          </div>
+          <span className="text-[11px] text-text-faint truncate block">
+            1.5h breakdown
+          </span>
         </div>
 
-        {/* Equipment Uptime */}
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm col-span-1 lg:col-span-1">
-          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Rig Uptime</span>
-          <div className="mt-1 text-xl sm:text-2xl font-bold text-emerald-600">{equipmentUptimePct}%</div>
-          <span className="text-[10px] text-gray-500 font-medium mt-0.5 block">1.5h breakdown</span>
+        {/* Metric 4: Fuel Variance */}
+        <div className="bg-surface p-4 rounded-lg border border-border shadow-soft space-y-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+            Fuel Variance
+          </span>
+          <div className="text-xl sm:text-2xl font-semibold text-text font-mono tabular-nums">
+            {fuelVariancePct}<span className="text-sm font-sans font-normal">%</span>
+          </div>
+          <span className="text-[11px] text-status-success font-medium block">
+            &lt;3% tolerance
+          </span>
         </div>
 
-        {/* Fuel Variance */}
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm col-span-1 lg:col-span-1">
-          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Fuel Variance</span>
-          <div className="mt-1 text-xl sm:text-2xl font-bold text-blue-600">{fuelVariancePct}%</div>
-          <span className="text-[10px] text-emerald-600 font-medium mt-0.5 block">&lt;3% in tolerance</span>
+        {/* Metric 5: Petty Cash Spend */}
+        <div className="bg-surface p-4 rounded-lg border border-border shadow-soft space-y-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+            Wallet Spend
+          </span>
+          <div className="text-xl sm:text-2xl font-semibold text-text font-mono tabular-nums">
+            ₹{pettyCashSpend.toLocaleString('en-IN')}
+          </div>
+          <span className="text-[11px] text-text-faint block">
+            4 Vouchers
+          </span>
         </div>
 
-        {/* Petty Cash */}
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm col-span-1 lg:col-span-1">
-          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Petty Cash Spend</span>
-          <div className="mt-1 text-xl sm:text-2xl font-bold text-amber-600">₹{pettyCashSpend.toLocaleString('en-IN')}</div>
-          <span className="text-[10px] text-gray-500 font-medium mt-0.5 block">4 Vouchers</span>
-        </div>
-
-        {/* Total Manpower */}
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm col-span-1 lg:col-span-1">
-          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total Hands</span>
-          <div className="mt-1 text-xl sm:text-2xl font-bold text-purple-600">{totalManpower}</div>
-          <span className="text-[10px] text-gray-500 font-medium mt-0.5 block">Direct + Gang</span>
+        {/* Metric 6: Total Hands */}
+        <div className="bg-surface p-4 rounded-lg border border-border shadow-soft space-y-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+            Total Hands
+          </span>
+          <div className="text-xl sm:text-2xl font-semibold text-text font-mono tabular-nums">
+            {totalManpower}
+          </div>
+          <span className="text-[11px] text-text-faint block">
+            Direct + Gang
+          </span>
         </div>
       </div>
 
-      {/* Main Content Layout: WhatsApp Preview & Operational Exceptions */}
+      {/* Main Grid: Monospace Dispatch Output & Operational Exceptions */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* WhatsApp Notification Preview Card (7 cols) */}
-        <div className="lg:col-span-7 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-          <div className="p-4 bg-emerald-700 text-white flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
+        {/* WhatsApp & Email Dispatch Output (7 cols) */}
+        <div className="lg:col-span-7 bg-surface rounded-lg border border-border shadow-soft overflow-hidden flex flex-col">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-surface-sunk/40">
+            <div className="flex items-center gap-2.5">
+              <MessageSquare className="h-4 w-4 text-accent" />
               <div>
-                <h3 className="text-sm font-bold leading-none">WhatsApp & Email Delivery Payload</h3>
-                <p className="text-[11px] text-emerald-100 mt-0.5">Simulated Celery morning dispatch output</p>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-text">
+                  Executive Dispatch Feed
+                </h3>
+                <p className="text-[11px] text-text-muted">
+                  Simulated multi-channel Celery broadcast
+                </p>
               </div>
             </div>
 
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={copyToClipboard}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white/20 hover:bg-white/30 px-3 py-1.5 text-xs font-semibold text-white transition-colors cursor-pointer"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-3.5 w-3.5 text-green-300" />
-                  <span>Copied!</span>
-                </>
-              ) : (
-                <>
+              leftIcon={
+                copied ? (
+                  <Check className="h-3.5 w-3.5 text-status-success" />
+                ) : (
                   <Copy className="h-3.5 w-3.5" />
-                  <span>Copy Payload</span>
-                </>
-              )}
-            </button>
+                )
+              }
+            >
+              {copied ? 'Copied' : 'Copy Payload'}
+            </Button>
           </div>
 
-          <div className="p-5 flex-1 bg-gray-50/50">
-            <pre className="text-xs font-mono text-gray-800 whitespace-pre-wrap leading-relaxed p-4 bg-white rounded-lg border border-gray-200 overflow-x-auto shadow-inner">
+          <div className="p-5 flex-1 bg-surface-sunk/20">
+            <pre className="p-4 rounded-md bg-surface-sunk border border-border font-mono text-xs text-text leading-relaxed whitespace-pre-wrap overflow-x-auto shadow-inner">
               {whatsappPayload}
             </pre>
           </div>
         </div>
 
-        {/* Operational Exceptions & Active Alerts (5 cols) */}
+        {/* Operational Exceptions Feed & Foundation Telemetry (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                Operational Exceptions Feed
-              </h3>
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                {alerts.length} Detected
-              </span>
-            </div>
-
-            <div className="mt-4 space-y-3">
+          <Card padding="md">
+            <CardHeader>
+              <div className="flex items-center justify-between w-full">
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-status-warning" />
+                  <span>Operational Exceptions</span>
+                </CardTitle>
+                <Badge variant="warning" size="sm">
+                  {alerts.length} Detected
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2.5">
               {alerts.map((alert, idx) => (
                 <div
                   key={idx}
-                  className={`p-3 rounded-lg border text-xs ${
+                  className={`p-3 rounded-md border text-xs space-y-1 transition-all ${
                     alert.severity === 'CRITICAL'
-                      ? 'bg-red-50 border-red-200 text-red-900'
+                      ? 'bg-status-danger-soft/30 border-status-danger/30'
                       : alert.severity === 'WARNING'
-                      ? 'bg-amber-50 border-amber-200 text-amber-900'
-                      : 'bg-blue-50 border-blue-200 text-blue-900'
+                      ? 'bg-status-warning-soft/30 border-status-warning/30'
+                      : 'bg-surface-sunk border-border'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold flex items-center gap-1.5">
-                      {alert.severity === 'CRITICAL' ? (
-                        <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
-                      ) : alert.severity === 'WARNING' ? (
-                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                      ) : (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" />
-                      )}
+                    <span className="font-semibold text-text flex items-center gap-1.5">
+                      <span
+                        className={`h-2 w-2 rounded-pill shrink-0 ${
+                          alert.severity === 'CRITICAL'
+                            ? 'bg-status-danger'
+                            : alert.severity === 'WARNING'
+                            ? 'bg-status-warning'
+                            : 'bg-status-success'
+                        }`}
+                      />
                       {alert.title}
                     </span>
-                    <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold bg-white/60">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-text-faint">
                       {alert.category || alert.severity}
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] leading-relaxed opacity-90">{alert.description}</p>
+                  <p className="text-[11px] text-text-muted leading-relaxed">
+                    {alert.description}
+                  </p>
                 </div>
               ))}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          {/* Foundation Progress Highlights */}
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-3">
-            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              <Layers className="h-4 w-4 text-indigo-600" />
-              Site Foundation Progress Status
-            </h3>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="text-gray-500">Cumulative Bored Piling</span>
-                <span className="font-bold text-gray-900">412.5 / 850.0 m (48.5%)</span>
+          {/* Cumulative Progress Benchmarks */}
+          <Card padding="md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-accent" />
+                <span>Foundation Progress Telemetry</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-xs">
+              <div className="flex justify-between py-1.5 border-b border-border">
+                <span className="text-text-muted">Cumulative Bored Piling</span>
+                <span className="font-semibold font-mono text-text">412.5 / 850.0 m (48.5%)</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="text-gray-500">Piles Cast to Date</span>
-                <span className="font-bold text-gray-900">22 of 48 Piles</span>
+              <div className="flex justify-between py-1.5 border-b border-border">
+                <span className="text-text-muted">Total Piles Cast</span>
+                <span className="font-semibold font-mono text-text">22 of 48 Piles</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="text-gray-500">Diesel Consumption Burn Rate</span>
-                <span className="font-bold text-emerald-600">24.5 L/hr (Normal)</span>
+              <div className="flex justify-between py-1.5 border-b border-border">
+                <span className="text-text-muted">Diesel Burn Rate</span>
+                <span className="font-semibold font-mono text-status-success">24.5 L/hr (Normal)</span>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-gray-500">Binding Wire Benchmark</span>
-                <span className="font-bold text-gray-900">9.8 kg/MT (Target &lt;10)</span>
+              <div className="flex justify-between py-1.5">
+                <span className="text-text-muted">Binding Wire Consumption</span>
+                <span className="font-semibold font-mono text-text">9.8 kg/MT (Target &lt;10)</span>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

@@ -3,8 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { useTheme } from '@/lib/theme-context';
 import apiClient from '@/lib/api-client';
-import { HardHat, Lock, User, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import {
+  Compass,
+  Lock,
+  User,
+  AlertCircle,
+  ArrowRight,
+  Sun,
+  Moon,
+  Shield,
+} from 'lucide-react';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
 import axios from 'axios';
 
 interface DemoAccount {
@@ -25,14 +37,14 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { resolvedTheme, toggleTheme } = useTheme();
 
   const [identifier, setIdentifier] = useState('');
   const [secret, setSecret] = useState('');
-  const [showSecret, setShowSecret] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // If already authenticated on this device, redirect to dashboard
+  // If already authenticated on this device, redirect to brief
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       router.replace('/brief');
@@ -42,7 +54,7 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!identifier.trim() || !secret.trim()) {
-      setErrorMessage('Please enter both your email/phone and password/PIN.');
+      setErrorMessage('Please enter your email/phone and password/PIN.');
       return;
     }
 
@@ -52,7 +64,6 @@ export default function LoginPage() {
     const isEmail = identifier.includes('@');
     const isNumericPin = /^\d{4,6}$/.test(secret);
 
-    // Build unified login payload
     const payload = isEmail
       ? {
           email: identifier.trim().toLowerCase(),
@@ -99,98 +110,97 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="relative min-h-screen flex flex-col items-center justify-center bg-bg px-4 sm:px-6 py-12 transition-colors duration-base select-none">
+      {/* Top Bar Floating Control */}
+      <header className="absolute top-6 right-6 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          title={`Switch to ${resolvedTheme === 'dark' ? 'Light' : 'Dark'} mode`}
+          className="p-2 text-text-muted hover:text-text rounded-pill bg-surface border border-border shadow-soft transition-colors cursor-pointer"
+        >
+          {resolvedTheme === 'dark' ? (
+            <Sun className="h-4 w-4 text-status-warning" />
+          ) : (
+            <Moon className="h-4 w-4 text-accent" />
+          )}
+        </button>
+      </header>
+
+      {/* Main Login Envelope */}
       <div className="w-full max-w-md space-y-6">
-        {/* Main Clean Standard Login Card */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
-          {/* Header & Branding */}
-          <div className="text-center mb-6">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm mb-3">
-              <HardHat className="h-6 w-6" />
+        {/* Architectural Portal Card */}
+        <div className="bg-surface border border-border rounded-lg shadow-float p-8 sm:p-10 space-y-6">
+          {/* Header */}
+          <div className="text-center space-y-2">
+            <div className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-accent-soft text-accent border border-accent/20 mb-1">
+              <Compass className="h-5 w-5" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">ODIPKS Construction OS</h1>
-            <p className="text-xs text-gray-500 mt-1">
-              Civil Infrastructure & Heavy Engineering Portal
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-text">
+              ODIPKS Review OS
+            </h1>
+            <p className="text-xs text-text-muted leading-relaxed">
+              Confidential AI Review & Heavy Engineering Operations
             </p>
           </div>
 
-          {/* Error Message */}
+          {/* Error Banner */}
           {errorMessage && (
-            <div className="rounded-lg bg-red-50 p-3 mb-4 border border-red-200 text-xs text-red-800 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
-              <span>{errorMessage}</span>
+            <div className="rounded-md bg-status-danger-soft p-3 border border-status-danger/20 text-xs text-status-danger flex items-center gap-2.5">
+              <AlertCircle className="h-4 w-4 shrink-0 text-status-danger" />
+              <span className="leading-tight">{errorMessage}</span>
             </div>
           )}
 
-          {/* Simple Dual-Input Form */}
+          {/* Form */}
           <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label htmlFor="identifier" className="block text-xs font-semibold text-gray-700 mb-1">
-                Email or Mobile Number
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 pointer-events-none">
-                  <User className="h-4 w-4" />
-                </span>
-                <input
-                  id="identifier"
-                  type="text"
-                  required
-                  autoComplete="username"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="name@odipks.com or 10-digit mobile"
-                  className="block w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2.5 text-sm shadow-xs placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-gray-900 font-medium"
-                />
-              </div>
-            </div>
+            <Input
+              label="Email or Mobile Identifier"
+              type="text"
+              required
+              autoComplete="username"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="name@odipks.com or 10-digit mobile"
+              leftIcon={<User className="h-4 w-4" />}
+            />
 
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label htmlFor="secret" className="block text-xs font-semibold text-gray-700">
-                  Password or Security PIN
-                </label>
-              </div>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 pointer-events-none">
-                  <Lock className="h-4 w-4" />
-                </span>
-                <input
-                  id="secret"
-                  type={showSecret ? 'text' : 'password'}
-                  required
-                  autoComplete="current-password"
-                  value={secret}
-                  onChange={(e) => setSecret(e.target.value)}
-                  placeholder="Account password or 4-digit PIN"
-                  className="block w-full rounded-lg border border-gray-300 pl-10 pr-10 py-2.5 text-sm shadow-xs placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-gray-900 font-medium"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowSecret(!showSecret)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 cursor-pointer"
-                  title={showSecret ? 'Hide secret' : 'Show secret'}
-                >
-                  {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
+            <Input
+              label="Security Password or PIN"
+              isPassword
+              required
+              autoComplete="current-password"
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+              placeholder="Password or 4-digit PIN"
+              leftIcon={<Lock className="h-4 w-4" />}
+            />
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50 transition-colors cursor-pointer"
-            >
-              <span>{isSubmitting ? 'Authenticating...' : 'Sign In'}</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
+            <div className="pt-2">
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                className="w-full"
+                isLoading={isSubmitting}
+                rightIcon={<ArrowRight className="h-4 w-4" />}
+              >
+                {isSubmitting ? 'Authenticating...' : 'Sign In to Workplace'}
+              </Button>
+            </div>
           </form>
+
+          {/* Confidential Trust Footer */}
+          <div className="pt-3 border-t border-border flex items-center justify-center gap-2 text-[11px] text-text-faint">
+            <Shield className="h-3.5 w-3.5 text-accent" />
+            <span>256-bit Encrypted Multi-Tenant Session</span>
+          </div>
         </div>
 
-        {/* Discrete Demo / Testing Helper at the bottom */}
-        <div className="bg-white/80 p-3.5 rounded-xl border border-gray-200/80 text-center">
-          <div className="text-[11px] font-semibold text-gray-500 mb-2">
-            Demo quick fill:
+        {/* Demo Fast-Switch Pill Group */}
+        <div className="bg-surface/70 border border-border rounded-lg p-4 text-center space-y-2.5 backdrop-blur-sm">
+          <div className="text-[11px] font-medium text-text-muted uppercase tracking-wider">
+            Quick Persona Fill
           </div>
           <div className="flex flex-wrap items-center justify-center gap-1.5">
             {DEMO_ACCOUNTS.map((d) => (
@@ -198,17 +208,13 @@ export default function LoginPage() {
                 key={d.role}
                 type="button"
                 onClick={() => applyDemo(d)}
-                className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-gray-100 hover:bg-indigo-50 text-gray-700 hover:text-indigo-700 transition-colors cursor-pointer border border-gray-200 hover:border-indigo-200"
+                className="px-2.5 py-1 text-xs rounded-pill bg-surface-sunk border border-border text-text hover:border-accent hover:text-accent transition-colors duration-fast font-medium cursor-pointer"
               >
                 {d.label}
               </button>
             ))}
           </div>
         </div>
-
-        <p className="text-center text-[11px] text-gray-400">
-          Protected civil engineering operating system. Unauthorized access strictly prohibited.
-        </p>
       </div>
     </div>
   );

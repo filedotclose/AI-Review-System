@@ -31,14 +31,14 @@ export function SyncStatusBadge() {
   return (
     <div className="flex items-center gap-2">
       {status.isOnline ? (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-          <Wifi className="h-3.5 w-3.5 text-green-600" />
-          Online
+        <span className="inline-flex items-center gap-1.5 rounded-pill bg-status-success-soft px-2.5 py-1 text-xs font-medium text-status-success border border-status-success/20">
+          <Wifi className="h-3 w-3" />
+          <span>Online</span>
         </span>
       ) : (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20">
-          <WifiOff className="h-3.5 w-3.5 text-amber-600" />
-          Offline Mode
+        <span className="inline-flex items-center gap-1.5 rounded-pill bg-status-warning-soft px-2.5 py-1 text-xs font-medium text-status-warning border border-status-warning/20">
+          <WifiOff className="h-3 w-3" />
+          <span>Offline Buffer</span>
         </span>
       )}
 
@@ -47,16 +47,16 @@ export function SyncStatusBadge() {
           type="button"
           onClick={handleManualSync}
           disabled={!status.isOnline || status.isSyncing}
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-all ${
+          className={`inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium transition-all duration-fast ${
             status.isOnline
-              ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 ring-1 ring-inset ring-indigo-700/20 cursor-pointer'
-              : 'bg-gray-100 text-gray-600 ring-1 ring-inset ring-gray-500/20 cursor-not-allowed'
+              ? 'bg-accent-soft text-accent hover:bg-accent/20 border border-accent/20 cursor-pointer'
+              : 'bg-surface-sunk text-text-faint border border-border cursor-not-allowed'
           }`}
-          title={status.isOnline ? 'Click to sync now' : 'Offline: items will sync when online'}
+          title={status.isOnline ? 'Click to sync offline buffer now' : 'Offline: items will sync automatically upon reconnection'}
         >
-          <RefreshCw className={`h-3 w-3 ${status.isSyncing ? 'animate-spin text-indigo-600' : ''}`} />
+          <RefreshCw className={`h-3 w-3 ${status.isSyncing ? 'animate-spin text-accent' : ''}`} />
           <span>{status.count} queued</span>
-          {status.isSyncing && <span className="text-[10px] text-indigo-500">Syncing...</span>}
+          {status.isSyncing && <span className="text-[10px] text-accent">Syncing...</span>}
         </button>
       )}
     </div>
