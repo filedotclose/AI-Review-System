@@ -74,6 +74,8 @@ services:
       dockerfile: Dockerfile
     container_name: construction_os_backend
     restart: always
+    ports:
+      - "8000:8000"
     env_file:
       - .env
     environment:

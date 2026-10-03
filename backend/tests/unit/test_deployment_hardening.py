@@ -48,9 +48,8 @@ def test_docker_compose_isolates_backend_and_frontend():
     assert '"80:80"' in compose_content
     assert '"443:443"' in compose_content
 
-    # Backend and frontend must NOT expose ports directly to host
-    # Searching for raw port exposes: "8000:8000" or "3000:3000"
-    assert '"8000:8000"' not in compose_content, "Backend port 8000 must NOT be exposed to host"
+    # Backend maps 8000 for Swagger docs, while frontend remains isolated
+    assert '"8000:8000"' in compose_content, "Backend port 8000 must be mapped for dedicated Swagger docs access"
     assert '"3000:3000"' not in compose_content, "Frontend port 3000 must NOT be exposed to host"
 
     # Celery worker must have --pool=solo to avoid multi-process RAM exhaustion on 1GB instance
@@ -61,9 +60,9 @@ def test_deploy_aws_firewall_rules():
     with open(DEPLOY_AWS, "r", encoding="utf-8") as f:
         script = f.read()
 
-    # Must NOT allow 3000 or 8000 through UFW
+    # Must NOT allow 3000 through UFW
     assert "ufw allow 3000" not in script, "UFW must not open port 3000 in production"
-    assert "ufw allow 8000" not in script, "UFW must not open port 8000 in production"
+    assert "ufw allow 8000" in script, "UFW must allow port 8000 for Swagger docs inspection"
 
     # Must allow 80 and 443
     assert "ufw allow 80/tcp" in script
@@ -112,9 +111,9 @@ def test_nginx_endpoint_routing_and_upstreams():
     assert "location ~ ^/api/(?:v1/)?auth(?:/|$)" in default_conf
     assert "zone=auth_limit" in default_conf
 
-    # Interactive API Docs with rewrite to backend
+    # Block /docs, /redoc, /openapi.json on standard HTTP/HTTPS traffic (port 80/443)
     assert "location ~ ^/(docs|redoc|openapi\\.json" in default_conf
-    assert "rewrite ^/api/(?:v1/)?(docs|redoc|openapi\\.json)" in default_conf
+    assert "return 404;" in default_conf
 
     # General API prefix routing
     assert "location /api" in default_conf
@@ -191,7 +190,7 @@ def test_nginx_route_resolution_simulation():
         if auth_pat.search(uri):
             return "backend_auth_strict"
         if docs_pat.search(uri):
-            return "backend_docs_rewrite"
+            return "blocked_404"
         if pwa_pat.search(uri):
             return "frontend_pwa_nocache"
         # 4. Prefix matches
@@ -216,13 +215,13 @@ def test_nginx_route_resolution_simulation():
     ]:
         assert route_request(path) == "backend_auth_strict", f"Failed to route auth path: {path}"
 
-    # Interactive Documentation & OpenAPI
+    # Documentation & OpenAPI blocked on port 80/443
     for path in [
         "/docs", "/docs/", "/redoc", "/redoc/", "/openapi.json",
         "/api/docs", "/api/v1/docs", "/api/redoc", "/api/v1/redoc",
         "/api/openapi.json", "/api/v1/openapi.json"
     ]:
-        assert route_request(path) == "backend_docs_rewrite", f"Failed to route docs path: {path}"
+        assert route_request(path) == "blocked_404", f"Failed to block docs path on port 80: {path}"
 
     # Business Domain API Endpoints
     for path in [

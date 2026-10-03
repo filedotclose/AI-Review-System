@@ -38,7 +38,6 @@ async def root():
         "message": "Welcome to ODIPKS Construction OS API",
         "status": "online",
         "version": "1.0.0",
-        "docs": "/docs",
     }
 
 @app.get("/health")

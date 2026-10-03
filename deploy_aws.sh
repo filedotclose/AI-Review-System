@@ -43,7 +43,8 @@ sudo ufw default allow outgoing
 sudo ufw allow 22/tcp    # SSH (Lock down to admin IP in AWS SG)
 sudo ufw allow 80/tcp    # HTTP (Reverse Proxy)
 sudo ufw allow 443/tcp   # HTTPS (SSL/TLS)
-# Ports 3000 & 8000 are explicitly NOT exposed to host/public
+sudo ufw allow 8000/tcp  # Swagger Documentation & Inspection (Dedicated Port)
+# Port 3000 is explicitly NOT exposed to host/public (internal to Nginx)
 sudo ufw --force enable
 
 # 5. Build and Launch Containers with Docker Compose
@@ -56,6 +57,6 @@ SERVER_IP=$(curl -s http://checkip.amazonaws.com || echo "localhost")
 echo "=================================================="
 echo "  DEPLOYMENT COMPLETE (PROTECTED BY NGINX PROXY)!"
 echo "  Application UI:    http://${SERVER_IP}"
-echo "  API Documentation: http://${SERVER_IP}/docs"
+echo "  API Documentation: http://${SERVER_IP}:8000/docs"
 echo "  Rate Limiting:     ACTIVE (Auth: 3r/s, API: 10r/s)"
 echo "=================================================="
