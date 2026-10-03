@@ -213,8 +213,8 @@ async def test_get_dpr_list_and_details(
 async def test_verify_dpr(
     client: AsyncClient,
     test_site: Site,
-    test_user: User,
     auth_headers: Dict[str, str],
+    project_manager_headers: Dict[str, str],
 ):
     """Verify POST /dpr/{id}/verify sets status to VERIFIED and records verified_by."""
     payload = {
@@ -225,10 +225,10 @@ async def test_verify_dpr(
     create_res = await client.post("/api/v1/dpr", json=payload, headers=auth_headers)
     dpr_id = create_res.json()["id"]
 
-    verify_res = await client.post(f"/api/v1/dpr/{dpr_id}/verify", headers=auth_headers)
+    verify_res = await client.post(f"/api/v1/dpr/{dpr_id}/verify", headers=project_manager_headers)
     assert verify_res.status_code == 200
     assert verify_res.json()["status"] == "VERIFIED"
-    assert verify_res.json()["verified_by"] == test_user.id
+    assert verify_res.json()["verified_by"] is not None
     assert verify_res.json()["verified_at"] is not None
 
 

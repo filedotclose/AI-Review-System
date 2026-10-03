@@ -199,34 +199,51 @@ def finance_head_token() -> str:
 
 
 @pytest.fixture
-def owner_headers(owner_token: str) -> Dict[str, str]:
+async def seeded_role_users(db_session: AsyncSession) -> Dict[str, User]:
+    users = {
+        "OWNER": User(id=1, name="Test Owner", phone="+919876543210", email="owner@odipks.test", role=UserRole.OWNER, is_active=True),
+        "PROJECT_MANAGER": User(id=2, name="Test PM", phone="+919876543211", email="pm@odipks.test", role=UserRole.PROJECT_MANAGER, is_active=True),
+        "SITE_ENGINEER": User(id=3, name="Test Engineer", phone="+919876543212", email="engineer@odipks.test", role=UserRole.SITE_ENGINEER, is_active=True),
+        "SUPERVISOR": User(id=4, name="Test Supervisor", phone="+919876543213", email="supervisor@odipks.test", role=UserRole.SUPERVISOR, is_active=True),
+        "FINANCE_HEAD": User(id=5, name="Test Finance", phone="+919876543214", email="finance@odipks.test", role=UserRole.FINANCE_HEAD, is_active=True),
+    }
+    for u in users.values():
+        db_session.add(u)
+    await db_session.commit()
+    for u in users.values():
+        await db_session.refresh(u)
+    return users
+
+
+@pytest.fixture
+def owner_headers(seeded_role_users: Dict[str, User], owner_token: str) -> Dict[str, str]:
     return {"Authorization": f"Bearer {owner_token}"}
 
 
 @pytest.fixture
-def supervisor_headers(supervisor_token: str) -> Dict[str, str]:
+def supervisor_headers(seeded_role_users: Dict[str, User], supervisor_token: str) -> Dict[str, str]:
     return {"Authorization": f"Bearer {supervisor_token}"}
 
 
 @pytest.fixture
-def site_engineer_headers(site_engineer_token: str) -> Dict[str, str]:
+def site_engineer_headers(seeded_role_users: Dict[str, User], site_engineer_token: str) -> Dict[str, str]:
     return {"Authorization": f"Bearer {site_engineer_token}"}
 
 
 @pytest.fixture
-async def test_user(db_session: AsyncSession) -> User:
-    """Pre-seeded User entity."""
-    user = User(
-        name="Test Engineer",
-        phone="+919876543210",
-        email="test.engineer@odipks.test",
-        role=UserRole.SITE_ENGINEER,
-        is_active=True,
-    )
-    db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
-    return user
+def finance_head_headers(seeded_role_users: Dict[str, User], finance_head_token: str) -> Dict[str, str]:
+    return {"Authorization": f"Bearer {finance_head_token}"}
+
+
+@pytest.fixture
+def project_manager_headers(seeded_role_users: Dict[str, User], project_manager_token: str) -> Dict[str, str]:
+    return {"Authorization": f"Bearer {project_manager_token}"}
+
+
+@pytest.fixture
+async def test_user(seeded_role_users: Dict[str, User]) -> User:
+    """Pre-seeded User entity (Site Engineer by default)."""
+    return seeded_role_users["SITE_ENGINEER"]
 
 
 @pytest.fixture

@@ -24,15 +24,35 @@ interface AuthContextType {
   refreshUserProfile: () => Promise<UserSession | null>;
 }
 
-export function setAuthCookie(token: string) {
+export function getDefaultRouteForRole(role?: string): string {
+  switch (role) {
+    case 'OWNER':
+      return '/brief';
+    case 'FINANCE_HEAD':
+      return '/petty-cash';
+    case 'PROJECT_MANAGER':
+    case 'SITE_ENGINEER':
+      return '/dpr';
+    case 'SUPERVISOR':
+      return '/attendance';
+    default:
+      return '/brief';
+  }
+}
+
+export function setAuthCookie(token: string, role?: string) {
   if (typeof document !== 'undefined') {
     document.cookie = `auth_token=${token}; path=/; max-age=604800; SameSite=Lax`;
+    if (role) {
+      document.cookie = `user_role=${role}; path=/; max-age=604800; SameSite=Lax`;
+    }
   }
 }
 
 export function clearAuthCookie() {
   if (typeof document !== 'undefined') {
     document.cookie = 'auth_token=; path=/; max-age=0; SameSite=Lax';
+    document.cookie = 'user_role=; path=/; max-age=0; SameSite=Lax';
   }
 }
 
@@ -76,6 +96,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(res.data);
         if (typeof window !== 'undefined') {
           localStorage.setItem('user', JSON.stringify(res.data));
+          const currentTok = localStorage.getItem('token');
+          if (currentTok) {
+            setAuthCookie(currentTok, res.data.role);
+          }
         }
         return res.data;
       }
@@ -95,7 +119,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAuthCookie(accessToken);
     }
     setToken(accessToken);
-    await refreshUserProfile();
+    const profile = await refreshUserProfile();
+    if (profile?.role) {
+      setAuthCookie(accessToken, profile.role);
+    }
   }, [refreshUserProfile]);
 
   useEffect(() => {

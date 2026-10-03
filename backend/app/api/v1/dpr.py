@@ -7,8 +7,8 @@ from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, Field
 
 from app.db.base import get_db
-from app.core.security import get_current_user
-from app.models.user import User
+from app.core.security import get_current_user, require_roles
+from app.models.user import User, UserRole
 from app.models.project import Site, Pile
 from app.models.equipment import ShiftType
 from app.models.dpr import (
@@ -340,7 +340,7 @@ async def log_pile_progress(
     progress_in: PileProgressLogRequest,
     dpr_id: Optional[int] = Query(None, description="Optional DPR ID in query param"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles([UserRole.SITE_ENGINEER, UserRole.PROJECT_MANAGER, UserRole.OWNER])),
 ):
     """
     Log or update piling progress for a pile within a DPR.
@@ -493,7 +493,7 @@ async def verify_dpr(
     id: int,
     verify_req: Optional[DPRVerifyRequest] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles([UserRole.PROJECT_MANAGER, UserRole.OWNER])),
 ):
     """
     Verify DPR: updates verification status, verified_by, and verified_at timestamp.

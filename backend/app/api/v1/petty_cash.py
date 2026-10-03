@@ -6,8 +6,8 @@ from sqlalchemy import select, and_
 from sqlalchemy.exc import IntegrityError
 
 from app.db.base import get_db
-from app.core.security import get_current_user
-from app.models.user import User
+from app.core.security import get_current_user, require_roles
+from app.models.user import User, UserRole
 from app.models.project import Site
 from app.models.petty_cash import (
     PettyCashWallet,
@@ -354,7 +354,7 @@ async def get_wallet(
 async def replenish_wallet(
     replenish_in: ReplenishmentCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles([UserRole.FINANCE_HEAD, UserRole.OWNER])),
 ):
     """Replenish a site petty cash wallet balance."""
     wallet = await db.get(PettyCashWallet, replenish_in.wallet_id)
@@ -466,7 +466,7 @@ async def settle_reimbursement(
     id: int,
     settle_req: ReimbursementSettleRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles([UserRole.FINANCE_HEAD, UserRole.OWNER])),
 ):
     """Settle an out-of-pocket transaction reimbursement."""
     tx = await db.get(PettyCashTransaction, id)
@@ -514,7 +514,7 @@ async def approve_expense(
     id: int,
     approval_req: ExpenseApprovalRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles([UserRole.FINANCE_HEAD, UserRole.PROJECT_MANAGER, UserRole.OWNER])),
 ):
     """Approve or reject a petty cash expense."""
     tx = await db.get(PettyCashTransaction, id)
@@ -553,7 +553,7 @@ async def export_tally_xml(
     to_date: Optional[date] = Query(None, description="End date"),
     export_format: str = Query("xml", alias="format", description="Export format (xml or json)"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles([UserRole.FINANCE_HEAD, UserRole.OWNER])),
 ):
     """
     Export petty cash expenses in Tally Prime XML format:

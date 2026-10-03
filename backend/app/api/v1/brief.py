@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.db.base import get_db
-from app.core.security import get_current_user
-from app.models.user import User
+from app.core.security import get_current_user, require_roles
+from app.models.user import User, UserRole
 from app.models.executive_brief import ExecutiveBrief, DeliveryStatus, DeliveryChannel
 from app.schemas.brief import (
     ExecutiveBriefResponse,
@@ -73,7 +73,7 @@ def serialize_brief_entity(brief: ExecutiveBrief) -> ExecutiveBriefResponse:
 async def get_daily_brief(
     date_filter: Optional[date] = Query(None, alias="date", description="Target operational date (YYYY-MM-DD)"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.PROJECT_MANAGER, UserRole.FINANCE_HEAD])),
 ):
     """
     Retrieve executive daily brief for a given operational date, or the latest available brief.
@@ -107,7 +107,7 @@ async def get_daily_brief(
 async def get_brief_history(
     limit: int = Query(30, ge=1, le=100, description="Max number of past briefs to return"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.PROJECT_MANAGER, UserRole.FINANCE_HEAD])),
 ):
     """
     Retrieve historical executive briefs ordered by operational date descending.
@@ -127,7 +127,7 @@ async def trigger_brief_generation(
     payload: Optional[BriefGenerateRequest] = None,
     target_date: Optional[date] = Query(None, alias="date", description="Operational date if not in body"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.PROJECT_MANAGER, UserRole.FINANCE_HEAD])),
 ):
     """
     Trigger executive brief generation for a given operational date.

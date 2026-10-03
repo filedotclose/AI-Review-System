@@ -225,6 +225,7 @@ async def test_tally_xml_export_valid_envelope(
     client: AsyncClient,
     test_site: Site,
     auth_headers: Dict[str, str],
+    finance_head_headers: Dict[str, str],
 ):
     """
     Verify Tally XML export produces valid XML envelope:
@@ -245,7 +246,7 @@ async def test_tally_xml_export_valid_envelope(
     # Export Tally XML
     res_export = await client.get(
         f"/api/v1/petty-cash/tally-export?site_id={test_site.id}",
-        headers=auth_headers,
+        headers=finance_head_headers,
     )
     assert res_export.status_code == 200
     assert "application/xml" in res_export.headers.get("content-type", "")
@@ -265,6 +266,7 @@ async def test_reimbursement_settle(
     client: AsyncClient,
     test_site: Site,
     auth_headers: Dict[str, str],
+    finance_head_headers: Dict[str, str],
 ):
     """
     Verify settling an out-of-pocket expense reimbursement.
@@ -287,7 +289,7 @@ async def test_reimbursement_settle(
     settle_res = await client.post(
         f"/api/v1/petty-cash/reimbursements/{tx_id}/settle",
         json=settle_payload,
-        headers=auth_headers,
+        headers=finance_head_headers,
     )
     assert settle_res.status_code == 200, settle_res.text
     settle_data = settle_res.json()
