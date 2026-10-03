@@ -72,20 +72,23 @@ def serialize_brief_entity(brief: ExecutiveBrief) -> ExecutiveBriefResponse:
 @router.get("/", response_model=ExecutiveBriefResponse, include_in_schema=False)
 async def get_daily_brief(
     date_filter: Optional[date] = Query(None, alias="date", description="Target operational date (YYYY-MM-DD)"),
+    target_date: Optional[date] = Query(None, description="Target operational date alias (YYYY-MM-DD)"),
+    site_id: Optional[int] = Query(None, description="Optional site filter"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.PROJECT_MANAGER, UserRole.FINANCE_HEAD])),
 ):
     """
     Retrieve executive daily brief for a given operational date, or the latest available brief.
     """
-    if date_filter:
-        stmt = select(ExecutiveBrief).where(ExecutiveBrief.operational_date == date_filter)
+    effective_date = date_filter or target_date
+    if effective_date:
+        stmt = select(ExecutiveBrief).where(ExecutiveBrief.operational_date == effective_date)
         res = await db.execute(stmt)
         brief = res.scalars().first()
         if not brief:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Executive brief not found for date {date_filter}.",
+                detail=f"Executive brief not found for date {effective_date}.",
             )
     else:
         stmt = select(ExecutiveBrief).order_by(
@@ -125,7 +128,9 @@ async def get_brief_history(
 @router.post("/generate", response_model=ExecutiveBriefResponse, status_code=status.HTTP_200_OK)
 async def trigger_brief_generation(
     payload: Optional[BriefGenerateRequest] = None,
-    target_date: Optional[date] = Query(None, alias="date", description="Operational date if not in body"),
+    date_param: Optional[date] = Query(None, alias="date", description="Operational date if not in body"),
+    target_date: Optional[date] = Query(None, description="Operational date alias if not in body"),
+    site_id: Optional[int] = Query(None, description="Optional site filter"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.PROJECT_MANAGER, UserRole.FINANCE_HEAD])),
 ):
@@ -134,7 +139,12 @@ async def trigger_brief_generation(
     Aggregates multi-table operational data across DPR, Fuel, Petty Cash, and Attendance,
     persists the ExecutiveBrief record, and dispatches simulated notifications.
     """
-    op_date = payload.operational_date if payload and payload.operational_date else (target_date or date.today())
+    op_date = (
+        (payload.operational_date if payload and payload.operational_date else None)
+        or target_date
+        or date_param
+        or date.today()
+    )
     delivery_channel = payload.delivery_channel if payload and payload.delivery_channel else DeliveryChannel.BOTH
 
     # Run aggregation engine with current DB session

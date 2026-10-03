@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import apiClient, { isOfflineQueued } from '@/lib/api-client';
+import apiClient, { isOfflineQueued, getApiBaseUrl } from '@/lib/api-client';
 import { compressImage, fileToDataUrl, formatFileSize } from '@/lib/image-compression';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -465,7 +465,7 @@ export default function PettyCashPage() {
   // Tally XML Export Download
   const handleTallyExport = async () => {
     try {
-      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      const baseURL = getApiBaseUrl();
       const url = `${baseURL}/petty-cash/tally-export?site_id=${siteId}&format=xml`;
       const token = localStorage.getItem('token');
       const headers: Record<string, string> = {};

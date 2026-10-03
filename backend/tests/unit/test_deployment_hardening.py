@@ -80,3 +80,168 @@ def test_frontend_api_client_relative_url_handling():
     # When running in browser behind reverse proxy, baseUrl should default to relative /api/v1
     assert "/api/v1" in client_code
     assert "http://localhost:8000" not in client_code or "NEXT_PUBLIC_API_URL" in client_code
+
+
+BACKEND_MAIN = os.path.join(ROOT_DIR, "backend", "app", "main.py")
+
+
+def test_nginx_endpoint_routing_and_upstreams():
+    with open(NGINX_DEFAULT_CONF, "r", encoding="utf-8") as f:
+        default_conf = f.read()
+
+    with open(NGINX_CONF, "r", encoding="utf-8") as f:
+        nginx_conf = f.read()
+
+    # Upstream declarations
+    assert "upstream backend_api" in default_conf
+    assert "upstream frontend_ui" in default_conf
+    assert "server backend:8000" in default_conf
+    assert "server frontend:3000" in default_conf
+
+    # Health check routing to backend and nginx self-health (supports optional trailing slash)
+    assert "location ~ ^/(health|healthz|api/health|api/v1/health)(?:/|$)" in default_conf
+    assert "location = /nginx-health" in default_conf
+    assert "location = /nginx-health/" in default_conf
+
+    # Custom JSON error responses for API breaches and upstream failures
+    assert "@rate_limit_exceeded" in default_conf
+    assert "@api_gateway_error" in default_conf
+    assert "@payload_too_large" in default_conf
+
+    # Auth routes with strict rate limit
+    assert "location ~ ^/api/(?:v1/)?auth(?:/|$)" in default_conf
+    assert "zone=auth_limit" in default_conf
+
+    # Interactive API Docs with rewrite to backend
+    assert "location ~ ^/(docs|redoc|openapi\\.json" in default_conf
+    assert "rewrite ^/api/(?:v1/)?(docs|redoc|openapi\\.json)" in default_conf
+
+    # General API prefix routing
+    assert "location /api" in default_conf
+    assert "zone=api_limit" in default_conf
+
+    # Next.js static assets and PWA service worker with keepalive
+    assert "/_next/static/" in default_conf
+    assert "location ~ ^/(sw\\.js|workbox-" in default_conf
+
+    # WebSocket connection upgrade and forwarded protocol support
+    assert "map $http_upgrade $connection_upgrade" in nginx_conf
+    assert "map $http_x_forwarded_proto $forwarded_proto" in nginx_conf
+    assert "$connection_upgrade" in default_conf
+    assert "$forwarded_proto" in default_conf
+
+
+def test_backend_main_routes_and_health():
+    with open(BACKEND_MAIN, "r", encoding="utf-8") as f:
+        main_code = f.read()
+
+    # Dual route registration for /api/v1 and /api
+    assert 'app.include_router(api_router, prefix="/api/v1")' in main_code
+    assert 'app.include_router(api_router, prefix="/api")' in main_code
+
+    # Health check endpoints with and without trailing slash
+    assert '@app.get("/health")' in main_code
+    assert '@app.get("/health/")' in main_code
+    assert '@app.get("/healthz")' in main_code
+    assert '@app.get("/healthz/")' in main_code
+    assert '@app.get("/api/health")' in main_code
+    assert '@app.get("/api/health/")' in main_code
+    assert '@app.get("/api/v1/health")' in main_code
+    assert '@app.get("/api/v1/health/")' in main_code
+
+    # Root endpoint aliases
+    assert '@app.get("/")' in main_code
+    assert '@app.get("/api")' in main_code
+    assert '@app.get("/api/v1")' in main_code
+
+
+def test_nginx_route_resolution_simulation():
+    """
+    Simulate Nginx location matching rules against all critical endpoints:
+    1. Exact match (=)
+    2. Regex match (~) in order of declaration
+    3. Prefix match (/api, /_next/static/, /)
+    """
+    with open(NGINX_DEFAULT_CONF, "r", encoding="utf-8") as f:
+        conf = f.read()
+
+    # Extract regex patterns
+    health_re = re.search(r'location\s+~\s+\^/([^ \t\r\n{]+)', conf).group(1)
+    health_pat = re.compile(rf"^/{health_re}")
+
+    auth_re = re.search(r'location\s+~\s+\^/api/([^ \t\r\n{]+)', conf).group(1)
+    auth_pat = re.compile(rf"^/api/{auth_re}")
+
+    docs_re = re.search(r'location\s+~\s+\^/([^ \t\r\n{]+docs[^ \t\r\n{]+)', conf).group(1)
+    docs_pat = re.compile(rf"^/{docs_re}")
+
+    pwa_re = re.search(r'location\s+~\s+\^/([^ \t\r\n{]+sw[^ \t\r\n{]+)', conf).group(1)
+    pwa_pat = re.compile(rf"^/{pwa_re}")
+
+    def route_request(uri: str) -> str:
+        # 1. Exact match
+        if uri in ("/nginx-health", "/nginx-health/"):
+            return "nginx_internal_health"
+        # 2. Preferential prefix
+        if uri.startswith("/_next/static/"):
+            return "frontend_static_cache"
+        # 3. Regex matches
+        if health_pat.search(uri):
+            return "backend_health"
+        if auth_pat.search(uri):
+            return "backend_auth_strict"
+        if docs_pat.search(uri):
+            return "backend_docs_rewrite"
+        if pwa_pat.search(uri):
+            return "frontend_pwa_nocache"
+        # 4. Prefix matches
+        if uri.startswith("/api"):
+            return "backend_api_general"
+        if uri.startswith("/"):
+            return "frontend_ui"
+        return "unrouted"
+
+    # Health Checks (with & without trailing slash)
+    for path in ["/health", "/health/", "/healthz", "/healthz/", "/api/health", "/api/health/", "/api/v1/health", "/api/v1/health/"]:
+        assert route_request(path) == "backend_health", f"Failed to route health path: {path}"
+
+    assert route_request("/nginx-health") == "nginx_internal_health"
+    assert route_request("/nginx-health/") == "nginx_internal_health"
+
+    # High-Security Auth Endpoints
+    for path in [
+        "/api/v1/auth", "/api/v1/auth/", "/api/v1/auth/login", "/api/v1/auth/pin-login",
+        "/api/v1/auth/email-login", "/api/v1/auth/me", "/api/v1/auth/logout", "/api/v1/auth/refresh",
+        "/api/auth", "/api/auth/", "/api/auth/login"
+    ]:
+        assert route_request(path) == "backend_auth_strict", f"Failed to route auth path: {path}"
+
+    # Interactive Documentation & OpenAPI
+    for path in [
+        "/docs", "/docs/", "/redoc", "/redoc/", "/openapi.json",
+        "/api/docs", "/api/v1/docs", "/api/redoc", "/api/v1/redoc",
+        "/api/openapi.json", "/api/v1/openapi.json"
+    ]:
+        assert route_request(path) == "backend_docs_rewrite", f"Failed to route docs path: {path}"
+
+    # Business Domain API Endpoints
+    for path in [
+        "/api", "/api/", "/api/v1", "/api/v1/",
+        "/api/v1/dpr", "/api/v1/dpr/123", "/api/v1/dpr/123/verify",
+        "/api/v1/fuel", "/api/v1/fuel/summary", "/api/v1/fuel-register",
+        "/api/v1/petty-cash", "/api/v1/petty-cash/expense", "/api/v1/petty_cash",
+        "/api/v1/attendance", "/api/v1/attendance/workers", "/api/v1/attendance/gang",
+        "/api/v1/brief", "/api/v1/brief/daily", "/api/v1/brief/today", "/api/v1/brief/history", "/api/v1/brief/generate"
+    ]:
+        assert route_request(path) == "backend_api_general", f"Failed to route general api path: {path}"
+
+    # Frontend Static & PWA Assets
+    assert route_request("/_next/static/chunks/main.js") == "frontend_static_cache"
+    assert route_request("/sw.js") == "frontend_pwa_nocache"
+    assert route_request("/workbox-f1770938.js") == "frontend_pwa_nocache"
+    assert route_request("/manifest.json") == "frontend_pwa_nocache"
+
+    # Frontend Web Application Navigation
+    for path in ["/", "/login", "/dpr", "/petty-cash", "/attendance", "/brief"]:
+        assert route_request(path) == "frontend_ui", f"Failed to route UI page: {path}"
+

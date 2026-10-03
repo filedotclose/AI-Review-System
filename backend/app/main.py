@@ -24,8 +24,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register API routes under both /api/v1 (standard) and /api (convenience)
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router, prefix="/api")
 
 @app.get("/")
+@app.get("/api")
+@app.get("/api/")
+@app.get("/api/v1")
+@app.get("/api/v1/")
 async def root():
-    return {"message": "Welcome to ODIPKS Construction OS API"}
+    return {
+        "message": "Welcome to ODIPKS Construction OS API",
+        "status": "online",
+        "version": "1.0.0",
+        "docs": "/docs",
+    }
+
+@app.get("/health")
+@app.get("/health/")
+@app.get("/healthz")
+@app.get("/healthz/")
+@app.get("/api/health")
+@app.get("/api/health/")
+@app.get("/api/v1/health")
+@app.get("/api/v1/health/")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "ODIPKS Construction OS API",
+        "version": "1.0.0",
+    }

@@ -29,12 +29,12 @@ export const getApiBaseUrl = (): string => {
     return process.env.NEXT_PUBLIC_API_URL;
   }
   if (typeof window !== 'undefined') {
-    // When served via Nginx reverse proxy on standard ports (80/443), use clean relative path
-    if (!window.location.port || window.location.port === '80' || window.location.port === '443') {
-      return '/api/v1';
+    // Standalone dev server fallback when frontend is running directly on :3000
+    if (window.location.port === '3000') {
+      return `http://${window.location.hostname}:8000/api/v1`;
     }
-    // Local development fallback when running frontend on separate dev port (e.g. :3000)
-    return `http://${window.location.hostname}:8000/api/v1`;
+    // When served via Nginx reverse proxy (standard ports 80/443 or reverse proxy port), use clean relative path
+    return '/api/v1';
   }
   return '/api/v1';
 };
@@ -55,8 +55,13 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
   // Check if browser is strictly offline
   if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && !navigator.onLine) {
     if (config.method && config.method.toLowerCase() !== 'get') {
+      const base = config.baseURL || getApiBaseUrl();
+      const relUrl = config.url || '';
+      const resolvedUrl = relUrl.startsWith('http://') || relUrl.startsWith('https://') || relUrl.startsWith('/api')
+        ? relUrl
+        : `${base.replace(/\/+$/, '')}/${relUrl.replace(/^\/+/, '')}`;
       const queuedId = await addPendingRequest({
-        url: config.url || '',
+        url: resolvedUrl,
         method: config.method || 'post',
         body: config.data,
         headers: (config.headers as unknown) as Record<string, string>,
@@ -89,8 +94,13 @@ apiClient.interceptors.response.use(
       error.config.method &&
       error.config.method.toLowerCase() !== 'get'
     ) {
+      const base = error.config.baseURL || getApiBaseUrl();
+      const relUrl = error.config.url || '';
+      const resolvedUrl = relUrl.startsWith('http://') || relUrl.startsWith('https://') || relUrl.startsWith('/api')
+        ? relUrl
+        : `${base.replace(/\/+$/, '')}/${relUrl.replace(/^\/+/, '')}`;
       const queuedId = await addPendingRequest({
-        url: error.config.url || '',
+        url: resolvedUrl,
         method: error.config.method || 'post',
         body: error.config.data,
         headers: (error.config.headers as unknown) as Record<string, string>,

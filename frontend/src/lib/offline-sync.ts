@@ -104,8 +104,14 @@ export async function syncPendingRequests() {
 
   for (const req of requests) {
     try {
+      let targetUrl = req.url;
+      if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        if (!targetUrl.startsWith('/api')) {
+          targetUrl = `/api/v1/${targetUrl.replace(/^\/+/, '')}`;
+        }
+      }
       await axios({
-        url: req.url,
+        url: targetUrl,
         method: req.method,
         data: req.body,
         headers: {
