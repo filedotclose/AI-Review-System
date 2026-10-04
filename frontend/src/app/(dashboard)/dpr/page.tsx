@@ -85,20 +85,18 @@ export default function DPRPage() {
   const isPMOrOwner = user?.role === 'PROJECT_MANAGER' || user?.role === 'OWNER';
 
   // Role Tab State
+  const [prevRole, setPrevRole] = useState(user?.role);
   const [activeTab, setActiveTab] = useState<'verification' | 'entry' | 'history'>(
     user?.role === 'PROJECT_MANAGER' ? 'verification' : 'entry'
   );
 
+  if (user?.role !== prevRole) {
+    setPrevRole(user?.role);
+    setActiveTab(user?.role === 'PROJECT_MANAGER' ? 'verification' : 'entry');
+  }
+
   // Active Two-Pane Review State (Section 7)
   const [activeReviewDpr, setActiveReviewDpr] = useState<ReviewDPRData | null>(null);
-
-  useEffect(() => {
-    if (user?.role === 'PROJECT_MANAGER') {
-      setActiveTab('verification');
-    } else if (user?.role === 'SITE_ENGINEER') {
-      setActiveTab('entry');
-    }
-  }, [user?.role]);
 
   // Verification Queue State
   const [dprQueue, setDprQueue] = useState<ReviewDPRData[]>(INITIAL_DPR_QUEUE);
