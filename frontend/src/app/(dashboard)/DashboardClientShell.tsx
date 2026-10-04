@@ -4,13 +4,13 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth, getDefaultRouteForRole } from '@/lib/auth-context';
-import { useTheme } from '@/lib/theme-context';
 import { SyncStatusBadge } from '@/components/ui/SyncStatusBadge';
 import { SecurityTrustIndicator } from '@/components/ui/SecurityTrustIndicator';
 import { PrivacyShield } from '@/components/ui/PrivacyShield';
 import { CommandPalette } from '@/components/ui/CommandPalette';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { ThemeSegmentedControl } from '@/components/ui/ThemeSegmentedControl';
 import apiClient from '@/lib/api-client';
 import {
   FileText,
@@ -22,8 +22,6 @@ import {
   ArrowRight,
   RefreshCw,
   Search,
-  Sun,
-  Moon,
   Compass,
 } from 'lucide-react';
 
@@ -39,7 +37,6 @@ export default function DashboardClientShell({ children }: { children: React.Rea
   const router = useRouter();
   const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout, login } = useAuth();
-  const { resolvedTheme, toggleTheme } = useTheme();
 
   const [isSwitchingRole, setIsSwitchingRole] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -318,7 +315,11 @@ export default function DashboardClientShell({ children }: { children: React.Rea
         </aside>
 
         {/* Main Workspace Frame */}
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden relative">
+          {/* Subtle atmospheric ambient glow orbs for glass refraction */}
+          <div className="absolute -top-32 right-1/4 w-[450px] h-[450px] bg-accent/8 rounded-pill filter blur-[140px] pointer-events-none" />
+          <div className="absolute bottom-10 right-10 w-80 h-80 bg-status-warning/6 rounded-pill filter blur-[120px] pointer-events-none" />
+
           {/* Frosted Glass Top Navigation Bar (Section 5 & 7) */}
           <header className="glass-surface sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border px-4 sm:px-6">
             <div className="flex items-center gap-3">
@@ -359,19 +360,8 @@ export default function DashboardClientShell({ children }: { children: React.Rea
               {/* Security & Confidentiality Trust Indicator */}
               <SecurityTrustIndicator userRole={user?.role} userName={user?.name} />
 
-              {/* Theme Toggle (Light / Dark) */}
-              <button
-                type="button"
-                onClick={toggleTheme}
-                title={`Switch to ${resolvedTheme === 'dark' ? 'Light' : 'Dark'} mode`}
-                className="p-1.5 text-text-muted hover:text-text rounded-pill hover:bg-surface-sunk transition-colors border border-border cursor-pointer"
-              >
-                {resolvedTheme === 'dark' ? (
-                  <Sun className="h-4 w-4 text-status-warning" />
-                ) : (
-                  <Moon className="h-4 w-4 text-accent" />
-                )}
-              </button>
+              {/* Prominent Theme Segmented Control (Light / Dark) */}
+              <ThemeSegmentedControl size="sm" />
 
               {/* Mobile Logout */}
               <button

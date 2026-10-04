@@ -186,7 +186,7 @@ export const TwoPaneReviewWorkspace: React.FC<TwoPaneReviewWorkspaceProps> = ({
   return (
     <div className="flex flex-col h-full bg-bg font-sans select-none">
       {/* Top Review Bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-surface shrink-0">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-border glass-surface shrink-0">
         <div className="flex items-center gap-3">
           {onBackToList && (
             <button

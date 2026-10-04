@@ -26,7 +26,6 @@ export const MaskedField: React.FC<MaskedFieldProps> = ({
     let interval: NodeJS.Timeout;
 
     if (isRevealed) {
-      setTimeLeft(timeoutSeconds);
       interval = setInterval(() => {
         setTimeLeft((prev) => (prev > 1 ? prev - 1 : 0));
       }, 1000);
@@ -79,7 +78,11 @@ export const MaskedField: React.FC<MaskedFieldProps> = ({
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          setIsRevealed(!isRevealed);
+          const next = !isRevealed;
+          setIsRevealed(next);
+          if (next) {
+            setTimeLeft(timeoutSeconds);
+          }
         }}
         title={isRevealed ? `Masking in ${timeLeft}s (Click to re-mask)` : 'Confidential: Click to reveal'}
         className="p-0.5 text-text-faint hover:text-text rounded transition-colors"

@@ -5,6 +5,7 @@ import React, { forwardRef } from 'react';
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   padding?: 'none' | 'sm' | 'md' | 'lg';
   isInteractive?: boolean;
+  variant?: 'solid' | 'glass';
 }
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
@@ -13,6 +14,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       children,
       padding = 'md',
       isInteractive = false,
+      variant = 'glass',
       className = '',
       ...props
     },
@@ -25,10 +27,15 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       lg: 'p-8',
     };
 
+    const variantStyles =
+      variant === 'glass'
+        ? 'glass-card'
+        : 'bg-surface border border-border shadow-soft';
+
     return (
       <div
         ref={ref}
-        className={`bg-surface border border-border rounded-lg shadow-soft transition-all duration-fast ease-calm ${
+        className={`${variantStyles} rounded-lg transition-all duration-fast ease-calm ${
           isInteractive
             ? 'hover:border-border-strong hover:shadow-float cursor-pointer'
             : ''

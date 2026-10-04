@@ -507,13 +507,69 @@ export default function DPRPage() {
 
       {/* TAB 1: PM Verification Queue (For Project Manager & Owner) */}
       {isPMOrOwner && activeTab === 'verification' && (
-        <div className="space-y-4">
+        <div className="space-y-5">
+          {/* Executive Queue KPI Summary Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+            <div className="bg-surface p-4 rounded-lg border border-border shadow-soft space-y-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                Awaiting Sign-off
+              </span>
+              <div className="text-xl sm:text-2xl font-bold font-mono text-status-warning tabular-nums">
+                {pendingVerificationCount} <span className="text-xs font-sans font-normal text-text-muted">DPR</span>
+              </div>
+              <span className="text-[11px] text-text-faint block">
+                Assigned to PM
+              </span>
+            </div>
+
+            <div className="bg-surface p-4 rounded-lg border border-border shadow-soft space-y-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                AI Mean Confidence
+              </span>
+              <div className="text-xl sm:text-2xl font-bold font-mono text-accent tabular-nums">
+                94.2%
+              </div>
+              <span className="text-[11px] text-text-faint block">
+                Kerala coastal baseline
+              </span>
+            </div>
+
+            <div className="bg-surface p-4 rounded-lg border border-border shadow-soft space-y-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                Average Overbreak
+              </span>
+              <div className="text-xl sm:text-2xl font-bold font-mono text-text tabular-nums">
+                +6.8%
+              </div>
+              <span className="text-[11px] text-status-success block font-medium">
+                Within &lt;15% tolerance
+              </span>
+            </div>
+
+            <div className="bg-surface p-4 rounded-lg border border-border shadow-soft space-y-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                Rig Status
+              </span>
+              <div className="text-xl sm:text-2xl font-bold font-mono text-text tabular-nums">
+                Active
+              </div>
+              <span className="text-[11px] text-text-faint block truncate">
+                Bauer BG-28 Rig #1
+              </span>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between pb-1">
-            <h2 className="text-sm font-semibold text-text uppercase tracking-wider">
-              Pending Operational Reviews ({pendingVerificationCount})
-            </h2>
-            <span className="text-xs text-text-faint">
-              Click any report to launch the Two-Pane Review Instrument
+            <div>
+              <h2 className="text-sm font-semibold text-text uppercase tracking-wider">
+                Operational Review Queue
+              </h2>
+              <p className="text-xs text-text-muted mt-0.5">
+                Select a report to launch the human-in-the-loop AI review workspace.
+              </p>
+            </div>
+            <span className="text-xs font-mono text-text-faint bg-surface-sunk px-2.5 py-1 rounded-pill border border-border">
+              {pendingVerificationCount} Pending Action
             </span>
           </div>
 
@@ -524,11 +580,11 @@ export default function DPRPage() {
                 padding="md"
                 isInteractive
                 onClick={() => setActiveReviewDpr(item)}
-                className={
+                className={`transition-all duration-fast ${
                   item.status === 'VERIFIED'
                     ? 'border-status-success/30 bg-surface'
-                    : 'border-border bg-surface'
-                }
+                    : 'border-border bg-surface hover:border-accent/40 shadow-soft'
+                }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
                   <div>

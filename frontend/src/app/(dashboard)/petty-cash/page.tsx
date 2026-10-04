@@ -97,6 +97,8 @@ const INITIAL_EXPENSES: ExpenseItem[] = [
   },
 ];
 
+const generateOfflineTxId = (): string => 'offline-' + Date.now();
+
 export default function PettyCashPage() {
   const { user } = useAuth();
   const [siteId] = useState('1');
@@ -115,6 +117,7 @@ export default function PettyCashPage() {
 
   useEffect(() => {
     if (user?.role === 'FINANCE_HEAD') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveTab('approvals');
     } else if (user?.role === 'SUPERVISOR') {
       setActiveTab('entry');
@@ -171,6 +174,7 @@ export default function PettyCashPage() {
   }, [siteId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchWallet();
   }, [fetchWallet]);
 
@@ -290,7 +294,7 @@ export default function PettyCashPage() {
     } catch (err: unknown) {
       if (isOfflineQueued(err)) {
         const queuedTx: ExpenseItem = {
-          id: 'offline-' + Date.now(),
+          id: generateOfflineTxId(),
           amount: numAmount,
           category,
           description: `[Offline] ${description}`,

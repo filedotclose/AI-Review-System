@@ -79,7 +79,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         className="fixed inset-0 bg-black/40 backdrop-blur-md transition-opacity"
       />
 
-      <div className="relative w-full max-w-lg bg-surface border border-border rounded-lg shadow-float overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-fast">
+      {/* Glassmorphic Command Surface */}
+      <div className="relative w-full max-w-lg glass-panel rounded-lg overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-fast">
         {/* Search Input Bar */}
         <div className="flex items-center px-4 py-3.5 border-b border-border gap-3 bg-surface-sunk/40">
           <Search className="h-4 w-4 text-text-faint shrink-0" />

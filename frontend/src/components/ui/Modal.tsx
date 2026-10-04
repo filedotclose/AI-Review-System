@@ -64,9 +64,9 @@ export const Modal: React.FC<ModalProps> = ({
         className="fixed inset-0 bg-black/40 backdrop-blur-md transition-opacity duration-base"
       />
 
-      {/* Modal Surface */}
+      {/* Glassmorphic Modal Surface */}
       <div
-        className={`relative w-full ${maxWidthStyles[maxWidth]} bg-surface border border-border rounded-lg shadow-float p-6 sm:p-7 z-10 animate-in fade-in zoom-in-95 duration-fast`}
+        className={`relative w-full ${maxWidthStyles[maxWidth]} glass-panel rounded-lg p-6 sm:p-7 z-10 animate-in fade-in zoom-in-95 duration-fast`}
       >
         <div className="flex items-start justify-between gap-4 pb-3">
           <div>

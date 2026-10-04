@@ -12,6 +12,8 @@ import {
   RefreshCw,
   TrendingUp,
   Layers,
+  Eye,
+  FileCode,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -42,6 +44,7 @@ export default function ExecutiveBriefPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [previewMode, setPreviewMode] = useState<'formatted' | 'raw'>('formatted');
 
   // Operational Metrics State
   const [pilingMeters, setPilingMeters] = useState(34.5);
@@ -104,6 +107,7 @@ export default function ExecutiveBriefPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadBrief(operationalDate);
   }, [operationalDate]);
 
@@ -328,34 +332,166 @@ ${alerts.map((a) => `• [${a.severity}] ${a.title}: ${a.description}`).join('\n
               <MessageSquare className="h-4 w-4 text-accent" />
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-text">
-                  Executive Dispatch Feed
+                  Executive Dispatch Preview
                 </h3>
                 <p className="text-[11px] text-text-muted">
-                  Simulated multi-channel Celery broadcast
+                  Simulated multi-channel broadcast (WhatsApp & Email)
                 </p>
               </div>
             </div>
 
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={copyToClipboard}
-              leftIcon={
-                copied ? (
-                  <Check className="h-3.5 w-3.5 text-status-success" />
-                ) : (
-                  <Copy className="h-3.5 w-3.5" />
-                )
-              }
-            >
-              {copied ? 'Copied' : 'Copy Payload'}
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* Toggle Formatted / Raw Monospace */}
+              <div className="inline-flex items-center p-0.5 rounded-pill bg-surface border border-border shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode('formatted')}
+                  className={`flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-pill font-medium transition-all ${
+                    previewMode === 'formatted'
+                      ? 'bg-surface-sunk text-text font-semibold shadow-soft'
+                      : 'text-text-muted hover:text-text'
+                  }`}
+                >
+                  <Eye className="h-3 w-3" />
+                  <span>Card</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode('raw')}
+                  className={`flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-pill font-medium transition-all ${
+                    previewMode === 'raw'
+                      ? 'bg-surface-sunk text-text font-semibold shadow-soft'
+                      : 'text-text-muted hover:text-text'
+                  }`}
+                >
+                  <FileCode className="h-3 w-3" />
+                  <span>Raw Text</span>
+                </button>
+              </div>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={copyToClipboard}
+                leftIcon={
+                  copied ? (
+                    <Check className="h-3.5 w-3.5 text-status-success" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )
+                }
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+            </div>
           </div>
 
-          <div className="p-5 flex-1 bg-surface-sunk/20">
-            <pre className="p-4 rounded-md bg-surface-sunk border border-border font-mono text-xs text-text leading-relaxed whitespace-pre-wrap overflow-x-auto shadow-inner">
-              {whatsappPayload}
-            </pre>
+          <div className="p-5 flex-1 bg-surface-sunk/20 overflow-y-auto max-h-[600px]">
+            {previewMode === 'formatted' ? (
+              /* Executive Smartphone Dispatch Card */
+              <div className="max-w-md mx-auto bg-surface border border-border rounded-lg shadow-float p-5 space-y-4">
+                {/* Simulated Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-border">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-pill bg-accent-soft text-accent flex items-center justify-center font-bold text-xs border border-accent/20">
+                      OD
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-text flex items-center gap-1">
+                        <span>ODIPKS Morning Dispatch</span>
+                        <span className="h-1.5 w-1.5 rounded-pill bg-status-success" />
+                      </div>
+                      <div className="text-[10px] text-text-muted font-mono">
+                        {operationalDate} • 08:00 AM IST
+                      </div>
+                    </div>
+                  </div>
+                  <Badge variant="verified" size="sm">
+                    Verified Broadcast
+                  </Badge>
+                </div>
+
+                {/* Dispatch Content Segments */}
+                <div className="space-y-3.5 text-xs text-text">
+                  {/* Segment 1: Production */}
+                  <div className="p-3 rounded-md bg-surface-sunk/60 border border-border space-y-1.5">
+                    <div className="font-semibold text-text flex items-center justify-between text-[11px] uppercase tracking-wider text-text-muted">
+                      <span>Production Scorecard</span>
+                      <span className="font-mono text-accent">Day + Night</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-text-muted block text-[10px]">Bored Piling:</span>
+                        <span className="font-semibold font-mono">{pilingMeters} m</span> (Socket: 4.5m)
+                      </div>
+                      <div>
+                        <span className="text-text-muted block text-[10px]">Piles Cast:</span>
+                        <span className="font-semibold font-mono">{pilesCompleted} piles</span>
+                      </div>
+                    </div>
+                    <div className="pt-1 text-[11px] text-text-muted flex items-center gap-1">
+                      <span>Rig Uptime:</span>
+                      <span className="font-semibold font-mono text-status-success">{equipmentUptimePct}%</span>
+                    </div>
+                  </div>
+
+                  {/* Segment 2: Operational Exceptions */}
+                  <div className="p-3 rounded-md bg-surface-sunk/60 border border-border space-y-2">
+                    <div className="font-semibold text-[11px] uppercase tracking-wider text-text-muted flex items-center justify-between">
+                      <span>Operational Exceptions</span>
+                      <span className="text-status-warning font-mono">{alerts.length} Flagged</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {alerts.map((a, i) => (
+                        <div key={i} className="text-[11px] p-2 rounded bg-surface border border-border/60">
+                          <span className="font-semibold text-text block">{a.title}</span>
+                          <span className="text-text-muted text-[10px] leading-tight block mt-0.5">{a.description}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Segment 3: Fuel & Finance */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="p-2.5 rounded-md bg-surface-sunk/60 border border-border">
+                      <span className="text-[10px] font-semibold uppercase text-text-muted block">Fuel Dip</span>
+                      <div className="text-xs font-mono font-semibold text-status-success mt-0.5">
+                        {fuelVariancePct}% Variance
+                      </div>
+                      <span className="text-[10px] text-text-faint">Tolerance &lt;3%</span>
+                    </div>
+                    <div className="p-2.5 rounded-md bg-surface-sunk/60 border border-border">
+                      <span className="text-[10px] font-semibold uppercase text-text-muted block">Petty Cash</span>
+                      <div className="text-xs font-mono font-semibold text-text mt-0.5">
+                        ₹{pettyCashSpend.toLocaleString('en-IN')}
+                      </div>
+                      <span className="text-[10px] text-text-faint">Supervisor claims</span>
+                    </div>
+                  </div>
+
+                  {/* Segment 4: Manpower */}
+                  <div className="p-2.5 rounded-md bg-surface-sunk/60 border border-border flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase text-text-muted block">Total Muster</span>
+                      <span className="text-xs font-medium text-text">{totalManpower} Workers On-Site</span>
+                    </div>
+                    <Badge variant="neutral" size="sm">
+                      4 Gangs
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Footer Note */}
+                <div className="pt-2 border-t border-border flex items-center justify-between text-[10px] text-text-faint">
+                  <span>Adani-ODIPKS AVRP Flyover Package</span>
+                  <span className="font-mono">End of Brief</span>
+                </div>
+              </div>
+            ) : (
+              <pre className="p-4 rounded-md bg-surface-sunk border border-border font-mono text-xs text-text leading-relaxed whitespace-pre-wrap overflow-x-auto shadow-inner">
+                {whatsappPayload}
+              </pre>
+            )}
           </div>
         </div>
 

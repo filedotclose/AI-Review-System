@@ -118,7 +118,7 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         if (window.location.pathname !== '/login') {
-          window.location.href = '/login?reason=session_expired';
+          window.location.replace('/login?reason=session_expired');
         }
       }
     }

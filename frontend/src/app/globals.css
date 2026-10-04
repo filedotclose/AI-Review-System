@@ -3,31 +3,31 @@
 @tailwind utilities;
 
 :root {
-  /* Surfaces: light mode - warm off-white */
-  --bg:            #FAFAF9;   /* page, warm off-white */
+  /* Surfaces: light mode - warm architectural alabaster */
+  --bg:            #F7F8F7;   /* page, warm off-white mineral tone */
   --surface:       #FFFFFF;   /* cards, panels */
-  --surface-sunk:  #F3F3F1;   /* inputs, wells, table headers */
-  --border:        rgba(20, 20, 25, 0.08);
-  --border-strong: rgba(20, 20, 25, 0.16);
+  --surface-sunk:  #EEF2F0;   /* inputs, wells, table headers */
+  --border:        rgba(18, 30, 24, 0.08);
+  --border-strong: rgba(18, 30, 24, 0.16);
 
-  /* Text */
-  --text:          #17171A;
-  --text-muted:    #6B6B73;
-  --text-faint:    #9A9AA2;
+  /* Text: deep mineral forest charcoal */
+  --text:          #121816;
+  --text-muted:    #55635F;
+  --text-faint:    #889692;
 
-  /* Accent: signature refined indigo */
-  --accent:        #3D4FD8;
-  --accent-soft:   rgba(61, 79, 216, 0.10);
-  --accent-hover:  #3242BE;
+  /* Accent: prestigious Deep Mineral Spruce */
+  --accent:        #1B4D3E;
+  --accent-soft:   rgba(27, 77, 62, 0.09);
+  --accent-hover:  #143C30;
   --accent-contrast: #FFFFFF;
 
-  /* Status: muted, precise, never neon */
-  --success:       #2F7D5B;
-  --success-soft:  rgba(47, 125, 91, 0.12);
-  --warning:       #B7791F;
-  --warning-soft:  rgba(183, 121, 31, 0.12);
-  --danger:        #B4443C;
-  --danger-soft:   rgba(180, 68, 60, 0.12);
+  /* Status: muted, precise, architectural */
+  --success:       #226C4E;
+  --success-soft:  rgba(34, 108, 78, 0.10);
+  --warning:       #9E6517;
+  --warning-soft:  rgba(158, 101, 23, 0.10);
+  --danger:        #A63B34;
+  --danger-soft:   rgba(166, 59, 52, 0.10);
 
   /* Shape and rhythm */
   --radius-sm:     8px;
@@ -36,10 +36,14 @@
   --radius-pill:   999px;
   --space:         8px;
 
-  /* Depth */
-  --shadow-soft:   0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
-  --shadow-float:  0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
-  --glass:         rgba(255, 255, 255, 0.75);
+  /* Depth & Glassmorphism */
+  --shadow-soft:       0 1px 2px rgba(18, 30, 24, 0.04), 0 8px 24px rgba(18, 30, 24, 0.06);
+  --shadow-float:      0 4px 20px rgba(18, 30, 24, 0.08), 0 1px 3px rgba(18, 30, 24, 0.05);
+  --shadow-glass:      0 8px 32px 0 rgba(18, 30, 24, 0.08), 0 1px 2px 0 rgba(18, 30, 24, 0.04);
+  --glass:             rgba(255, 255, 255, 0.70);
+  --glass-card:        rgba(255, 255, 255, 0.75);
+  --glass-border:      rgba(255, 255, 255, 0.65);
+  --glass-specular:    inset 0 1px 1px 0 rgba(255, 255, 255, 0.85);
 
   /* Motion */
   --ease:          cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -48,61 +52,69 @@
 }
 
 [data-theme="dark"] {
-  /* Surfaces: dark mode - deep near-black with refined depth */
-  --bg:            #0E0E10;
-  --surface:       #161618;
-  --surface-sunk:  #1D1D20;
-  --border:        rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
+  /* Surfaces: dark mode - obsidian pine with architectural depth */
+  --bg:            #0C0E0D;
+  --surface:       #141816;
+  --surface-sunk:  #1B211E;
+  --border:        rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.18);
 
-  /* Text */
-  --text:          #F2F2F3;
-  --text-muted:    #9C9CA5;
-  --text-faint:    #6E6E77;
+  /* Text: crisp luminous mineral */
+  --text:          #F1F4F2;
+  --text-muted:    #8E9C98;
+  --text-faint:    #5C6A66;
 
-  /* Accent: luminous desaturated indigo */
-  --accent:        #7B8BFF;
-  --accent-soft:   rgba(123, 139, 255, 0.14);
-  --accent-hover:  #8E9DFF;
-  --accent-contrast: #0E0E10;
+  /* Accent: luminous Sage Emerald */
+  --accent:        #3ED59A;
+  --accent-soft:   rgba(62, 213, 154, 0.14);
+  --accent-hover:  #58E2AE;
+  --accent-contrast: #0C0E0D;
 
   /* Status: muted, luminous */
-  --success:       #4EAA7F;
-  --success-soft:  rgba(78, 170, 127, 0.14);
-  --warning:       #D69538;
-  --warning-soft:  rgba(214, 149, 56, 0.14);
-  --danger:        #D46159;
-  --danger-soft:   rgba(212, 97, 89, 0.14);
+  --success:       #3ED59A;
+  --success-soft:  rgba(62, 213, 154, 0.14);
+  --warning:       #E5A138;
+  --warning-soft:  rgba(229, 161, 56, 0.14);
+  --danger:        #E25850;
+  --danger-soft:   rgba(226, 88, 80, 0.14);
 
-  /* Depth */
-  --shadow-soft:   0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.45);
-  --shadow-float:  0 4px 24px rgba(0, 0, 0, 0.6), 0 1px 4px rgba(0, 0, 0, 0.4);
-  --glass:         rgba(22, 22, 24, 0.78);
+  /* Depth & Glassmorphism */
+  --shadow-soft:       0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-float:      0 4px 24px rgba(0, 0, 0, 0.65), 0 1px 4px rgba(0, 0, 0, 0.45);
+  --shadow-glass:      0 12px 40px 0 rgba(0, 0, 0, 0.55), 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --glass:             rgba(20, 24, 22, 0.72);
+  --glass-card:        rgba(24, 28, 26, 0.65);
+  --glass-border:      rgba(255, 255, 255, 0.12);
+  --glass-specular:    inset 0 1px 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg:            #0E0E10;
-    --surface:       #161618;
-    --surface-sunk:  #1D1D20;
-    --border:        rgba(255, 255, 255, 0.08);
-    --border-strong: rgba(255, 255, 255, 0.16);
-    --text:          #F2F2F3;
-    --text-muted:    #9C9CA5;
-    --text-faint:    #6E6E77;
-    --accent:        #7B8BFF;
-    --accent-soft:   rgba(123, 139, 255, 0.14);
-    --accent-hover:  #8E9DFF;
-    --accent-contrast: #0E0E10;
-    --success:       #4EAA7F;
-    --success-soft:  rgba(78, 170, 127, 0.14);
-    --warning:       #D69538;
-    --warning-soft:  rgba(214, 149, 56, 0.14);
-    --danger:        #D46159;
-    --danger-soft:   rgba(212, 97, 89, 0.14);
-    --shadow-soft:   0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.45);
-    --shadow-float:  0 4px 24px rgba(0, 0, 0, 0.6), 0 1px 4px rgba(0, 0, 0, 0.4);
-    --glass:         rgba(22, 22, 24, 0.78);
+    --bg:            #0C0E0D;
+    --surface:       #141816;
+    --surface-sunk:  #1B211E;
+    --border:        rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --text:          #F1F4F2;
+    --text-muted:    #8E9C98;
+    --text-faint:    #5C6A66;
+    --accent:        #3ED59A;
+    --accent-soft:   rgba(62, 213, 154, 0.14);
+    --accent-hover:  #58E2AE;
+    --accent-contrast: #0C0E0D;
+    --success:       #3ED59A;
+    --success-soft:  rgba(62, 213, 154, 0.14);
+    --warning:       #E5A138;
+    --warning-soft:  rgba(229, 161, 56, 0.14);
+    --danger:        #E25850;
+    --danger-soft:   rgba(226, 88, 80, 0.14);
+    --shadow-soft:       0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.5);
+    --shadow-float:      0 4px 24px rgba(0, 0, 0, 0.65), 0 1px 4px rgba(0, 0, 0, 0.45);
+    --shadow-glass:      0 12px 40px 0 rgba(0, 0, 0, 0.55), 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+    --glass:             rgba(20, 24, 22, 0.72);
+    --glass-card:        rgba(24, 28, 26, 0.65);
+    --glass-border:      rgba(255, 255, 255, 0.12);
+    --glass-specular:    inset 0 1px 1px 0 rgba(255, 255, 255, 0.18);
   }
 }
 
@@ -135,11 +147,41 @@ code, kbd, samp, pre {
   font-variant-numeric: tabular-nums;
 }
 
-/* Glass backdrop surfaces */
+/* Authentic Glassmorphism Classes */
+.glass-panel {
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass), var(--glass-specular);
+}
+
+.glass-card {
+  background: var(--glass-card);
+  backdrop-filter: blur(16px) saturate(170%);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-soft), var(--glass-specular);
+  transition: all var(--fast) var(--ease);
+}
+.glass-card:hover {
+  box-shadow: var(--shadow-glass), var(--glass-specular);
+  border-color: var(--border-strong);
+}
+
+.glass-pill {
+  background: var(--glass-card);
+  backdrop-filter: blur(16px) saturate(170%);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), var(--glass-specular);
+}
+
 .glass-surface {
   background: var(--glass);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
 }
 
 /* Focus ring standard */

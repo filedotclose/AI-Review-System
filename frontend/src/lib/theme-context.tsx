@@ -25,6 +25,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Read stored theme preference
     const stored = (localStorage.getItem('odipks_theme') as Theme) || 'system';
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setThemeState(stored);
   }, []);
 
