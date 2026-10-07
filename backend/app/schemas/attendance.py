@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
+from pydantic import BaseModel, Field, ConfigDict, model_validator
+from typing import Optional, List, Any
 from datetime import date, datetime
 from app.models.attendance import WorkerCategory, AttendanceStatus, GangTrade
 from app.models.equipment import ShiftType
@@ -44,6 +44,21 @@ class GangMusterCreate(BaseModel):
     headcount_present: int = Field(gt=0)
     total_ot_hours: float = Field(default=0.0, ge=0.0)
     muster_roll_photo_url: Optional[str] = None
+    headcount: Optional[int] = None
+    ot_hours: Optional[float] = None
+    photo_url: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_field_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if ("headcount_present" not in data or data["headcount_present"] is None) and "headcount" in data:
+                data["headcount_present"] = data["headcount"]
+            if ("total_ot_hours" not in data or data["total_ot_hours"] is None) and "ot_hours" in data:
+                data["total_ot_hours"] = data["ot_hours"]
+            if ("muster_roll_photo_url" not in data or data["muster_roll_photo_url"] is None) and "photo_url" in data:
+                data["muster_roll_photo_url"] = data["photo_url"]
+        return data
 
 GangAttendanceCreate = GangMusterCreate
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import apiClient, { isOfflineQueued } from '@/lib/api-client';
 import { compressImage, fileToDataUrl } from '@/lib/image-compression';
 import {
@@ -62,13 +62,7 @@ function calculateHaversineDistanceM(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const INITIAL_WORKERS: WorkerItem[] = [
-  { id: 101, name: 'Ramesh Kumar', category: 'RIG_OPERATOR', checkedIn: false },
-  { id: 102, name: 'Suresh Yadav', category: 'WELDER', checkedIn: true, checkInTime: '07:55 AM', withinGeofence: true },
-  { id: 103, name: 'Manoj Singh', category: 'RIG_HELPER', checkedIn: true, checkInTime: '08:05 AM', withinGeofence: true },
-  { id: 104, name: 'Anil Pillai', category: 'FITTER', checkedIn: false },
-  { id: 105, name: 'Vikram Das', category: 'LABOURER', checkedIn: false },
-];
+const INITIAL_WORKERS: WorkerItem[] = [];
 
 const INITIAL_GANGS: GangRecord[] = [
   {
@@ -99,9 +93,55 @@ export default function AttendancePage() {
 
   // Direct Workers State
   const [workers, setWorkers] = useState<WorkerItem[]>(INITIAL_WORKERS);
-  const [selectedWorkerId] = useState<number>(101);
+  const [submittingWorkerId, setSubmittingWorkerId] = useState<number | null>(null);
   const [currentGps, setCurrentGps] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+
+  // Fetch registered workers and live attendance from backend
+  useEffect(() => {
+    let isMounted = true;
+    async function loadWorkersAndAttendance() {
+      try {
+        const [workersRes, siteAttRes] = await Promise.all([
+          apiClient.get(`/attendance/workers?site_id=${siteId}`),
+          apiClient.get(`/attendance/site/${siteId}?date=${date}&shift=${shift}`).catch(() => null),
+        ]);
+
+        if (isMounted && Array.isArray(workersRes.data)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const checkedInMap = new Map<number, any>();
+          if (siteAttRes?.data?.workers && Array.isArray(siteAttRes.data.workers)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            for (const att of siteAttRes.data.workers) {
+              checkedInMap.set(att.worker_id, att);
+            }
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const apiWorkers: WorkerItem[] = workersRes.data.map((w: any) => {
+            const att = checkedInMap.get(w.id);
+            return {
+              id: w.id,
+              name: w.name,
+              category: w.category,
+              checkedIn: !!att,
+              checkInTime: att?.check_in_time
+                ? new Date(att.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : undefined,
+              withinGeofence: att?.within_geofence ?? true,
+            };
+          });
+          setWorkers(apiWorkers);
+        }
+      } catch (err) {
+        console.warn('Could not fetch workers from API:', err);
+      }
+    }
+    loadWorkersAndAttendance();
+    return () => {
+      isMounted = false;
+    };
+  }, [siteId, date, shift]);
 
   // Subcontractor Gang Muster Form State
   const [gangRecords, setGangRecords] = useState<GangRecord[]>(INITIAL_GANGS);
@@ -166,10 +206,12 @@ export default function AttendancePage() {
 
   // Handle Direct Worker Check-In
   const handleCheckIn = async (workerId?: number) => {
-    const targetId = workerId || selectedWorkerId;
+    const targetId = workerId || workers[0]?.id;
+    if (!targetId) return;
     const worker = workers.find((w) => w.id === targetId);
     if (!worker) return;
 
+    setSubmittingWorkerId(targetId);
     setIsSubmitting(true);
     setToastMessage(null);
 
@@ -227,6 +269,7 @@ export default function AttendancePage() {
       }
     } finally {
       setIsSubmitting(false);
+      setSubmittingWorkerId(null);
     }
   };
 
@@ -264,10 +307,13 @@ export default function AttendancePage() {
         site_id: parseInt(siteId, 10),
         subcontractor_name: subcontractorName,
         trade: gangTrade,
-        headcount: count,
-        ot_hours: parseFloat(otHours) || 0,
+        headcount_present: count,
+        total_ot_hours: parseFloat(otHours) || 0,
         shift,
         date,
+        muster_roll_photo_url: musterPhoto?.dataUrl || null,
+        headcount: count,
+        ot_hours: parseFloat(otHours) || 0,
         photo_url: musterPhoto?.dataUrl || null,
       });
       const newRec: GangRecord = {
@@ -456,7 +502,14 @@ export default function AttendancePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {workers.map((worker) => (
+                {workers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" className="py-8 text-xs text-text-muted">
+                      No direct workers registered on site roster yet.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  workers.map((worker) => (
                   <TableRow key={worker.id}>
                     <TableCell isNumeric>#{worker.id}</TableCell>
                     <TableCell className="font-medium text-text">{worker.name}</TableCell>
@@ -491,15 +544,16 @@ export default function AttendancePage() {
                           variant="primary"
                           size="sm"
                           onClick={() => handleCheckIn(worker.id)}
-                          isLoading={isSubmitting && selectedWorkerId === worker.id}
+                          isLoading={isSubmitting && submittingWorkerId === worker.id}
                         >
                           Mark Present
                         </Button>
                       )}
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
+                ))
+              )}
+            </TableBody>
             </Table>
           </CardContent>
         </Card>

@@ -331,3 +331,33 @@ async def test_unauthenticated_petty_cash_access_rejected(
 
     res2 = await client.get(f"/api/v1/petty-cash/wallet/{test_site.id}")
     assert res2.status_code == 401
+
+
+@pytest.mark.integration
+@pytest.mark.anyio
+async def test_wallet_and_expense_unknown_site_fallback(
+    client: AsyncClient,
+    test_site: Site,
+    auth_headers: Dict[str, str],
+):
+    """
+    Verify fallback resolution when an unknown site_id is passed to petty cash:
+    Instead of raising 500 NameError for SiteStatus, it resolves to active site.
+    """
+    # 1. Fetch wallet with non-existent site_id
+    w_res = await client.get("/api/v1/petty-cash/wallet/99999", headers=auth_headers)
+    assert w_res.status_code == 200, w_res.text
+    assert "current_balance" in w_res.json()
+
+    # 2. Create expense with non-existent site_id
+    exp_payload = {
+        "site_id": 99999,
+        "amount": 1250.0,
+        "category": "FOOD_WATER",
+        "description": "Fallback site expense test",
+        "has_physical_bill": False,
+        "date": "2026-09-24",
+    }
+    exp_res = await client.post("/api/v1/petty-cash/expenses", json=exp_payload, headers=auth_headers)
+    assert exp_res.status_code in (200, 201), exp_res.text
+

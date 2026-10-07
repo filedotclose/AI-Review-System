@@ -325,3 +325,29 @@ async def test_unauthenticated_attendance_access_rejected(
 
     res2 = await client.post("/api/v1/attendance/gang-muster", json={"site_id": test_site.id})
     assert res2.status_code == 401
+
+
+@pytest.mark.integration
+@pytest.mark.anyio
+async def test_worker_check_in_unknown_site_fallback(
+    client: AsyncClient,
+    test_worker: Worker,
+    auth_headers: Dict[str, str],
+):
+    """
+    Verify fallback resolution when an unknown site_id is passed:
+    Instead of raising 500 NameError for SiteStatus, it resolves to active site.
+    """
+    payload = {
+        "site_id": 99999,
+        "worker_id": test_worker.id,
+        "date": "2026-09-23",
+        "shift": "DAY",
+        "check_in_lat": 22.3072,
+        "check_in_lng": 73.1812,
+    }
+    res = await client.post("/api/v1/attendance/check-in", json=payload, headers=auth_headers)
+    assert res.status_code in (200, 201), res.text
+    data = res.json()
+    assert data["worker_id"] == test_worker.id
+

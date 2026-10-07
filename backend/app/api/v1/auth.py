@@ -37,21 +37,36 @@ async def login(
     Authenticate user via phone or email, with password or 4-6 digit PIN.
     Returns access and refresh JWT tokens.
     """
-    if not login_data.phone and not login_data.email:
+    identifier = (login_data.email or login_data.phone or "").strip()
+    if not identifier:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Either phone or email must be provided",
         )
 
-    user: Optional[User] = None
-    if login_data.phone:
-        stmt = select(User).where(User.phone == login_data.phone)
-        result = await db.execute(stmt)
-        user = result.scalar_one_or_none()
-    elif login_data.email:
-        stmt = select(User).where(User.email == login_data.email)
-        result = await db.execute(stmt)
-        user = result.scalar_one_or_none()
+    # Standardize identifier aliases
+    alias_map = {
+        "engga": "engga@odipks.com",
+        "enggb": "enggb@odipks.com",
+        "enggc": "enggc@odipks.com",
+        "engg_a": "engga@odipks.com",
+        "engg_b": "enggb@odipks.com",
+        "engg_c": "enggc@odipks.com",
+        "owner": "owner@odipks.com",
+        "pm": "pm@odipks.com",
+        "finance": "finance@odipks.com",
+        "supervisor": "supervisor@odipks.com",
+    }
+    normalized_id = alias_map.get(identifier.lower(), identifier)
+
+    stmt = select(User).where(
+        (User.email.ilike(normalized_id))
+        | (User.phone == identifier)
+        | (User.email.ilike(f"{identifier}@odipks.com"))
+        | (User.name.ilike(f"%{identifier}%"))
+    )
+    result = await db.execute(stmt)
+    user = result.scalars().first()
 
     if not user:
         raise HTTPException(

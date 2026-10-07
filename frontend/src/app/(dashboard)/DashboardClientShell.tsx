@@ -25,20 +25,11 @@ import {
   Compass,
 } from 'lucide-react';
 
-const DEMO_PERSONAS = [
-  { role: 'OWNER', label: 'Company Owner', name: 'Pradeep K. Sharma', phone: '9800000001', pin: '1234', defaultPath: '/brief' },
-  { role: 'FINANCE_HEAD', label: 'Finance Head', name: 'Ananya Sen', phone: '9800000002', pin: '1234', defaultPath: '/petty-cash' },
-  { role: 'PROJECT_MANAGER', label: 'Project Manager', name: 'Vikram Mehta', phone: '9811122233', pin: '9999', defaultPath: '/dpr' },
-  { role: 'SITE_ENGINEER', label: 'Site Engineer', name: 'Rajesh Sharma', phone: '9876543210', pin: '1234', defaultPath: '/dpr' },
-  { role: 'SUPERVISOR', label: 'Site Supervisor', name: 'Sunil Varma', phone: '9876543211', pin: '1234', defaultPath: '/attendance' },
-];
-
 export default function DashboardClientShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isAuthenticated, isLoading, logout, login } = useAuth();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
 
-  const [isSwitchingRole, setIsSwitchingRole] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   useEffect(() => {
@@ -107,7 +98,7 @@ export default function DashboardClientShell({ children }: { children: React.Rea
       case 'OWNER':
         return [
           { href: '/brief', label: 'Executive Brief', icon: LayoutDashboard },
-          { href: '/dpr', label: 'DPR & Review Queue', icon: FileText },
+          { href: '/dpr', label: 'DPR Review & Queue', icon: FileText },
           { href: '/petty-cash', label: 'Petty Cash Ledger', icon: Wallet },
           { href: '/attendance', label: 'Labour Muster', icon: Users },
         ];
@@ -118,14 +109,14 @@ export default function DashboardClientShell({ children }: { children: React.Rea
         ];
       case 'PROJECT_MANAGER':
         return [
-          { href: '/dpr', label: 'DPR & Verification', icon: FileText },
+          { href: '/dpr', label: 'DPR Verification Queue', icon: FileText },
           { href: '/brief', label: 'Operational Brief', icon: LayoutDashboard },
           { href: '/attendance', label: 'Attendance & Labour', icon: Users },
           { href: '/petty-cash', label: 'Site Petty Cash', icon: Wallet },
         ];
       case 'SITE_ENGINEER':
         return [
-          { href: '/dpr', label: 'DPR Technical Entry', icon: FileText },
+          { href: '/dpr', label: 'DPR Upload & Entry', icon: FileText },
           { href: '/petty-cash', label: 'Emergency Spends', icon: Wallet },
         ];
       case 'SUPERVISOR':
@@ -136,7 +127,7 @@ export default function DashboardClientShell({ children }: { children: React.Rea
       default:
         return [
           { href: '/brief', label: 'Executive Brief', icon: LayoutDashboard },
-          { href: '/dpr', label: 'DPR Entry', icon: FileText },
+          { href: '/dpr', label: 'DPR Review Queue', icon: FileText },
           { href: '/petty-cash', label: 'Petty Cash', icon: Wallet },
           { href: '/attendance', label: 'Attendance', icon: Users },
         ];
@@ -144,24 +135,6 @@ export default function DashboardClientShell({ children }: { children: React.Rea
   };
 
   const navItems = getNavItemsForRole(user?.role);
-
-  const handleQuickSwitchRole = async (targetPhone: string, targetPin: string, targetPath: string) => {
-    try {
-      setIsSwitchingRole(true);
-      const res = await apiClient.post('/auth/login', {
-        phone: targetPhone,
-        pin: targetPin,
-      });
-      if (res.data?.access_token) {
-        await login(res.data.access_token, res.data.refresh_token);
-        router.push(targetPath);
-      }
-    } catch (err) {
-      console.error('Failed to switch persona:', err);
-    } finally {
-      setIsSwitchingRole(false);
-    }
-  };
 
   const isBriefRestricted =
     pathname === '/brief' && (user?.role === 'SUPERVISOR' || user?.role === 'SITE_ENGINEER');
@@ -178,7 +151,6 @@ export default function DashboardClientShell({ children }: { children: React.Rea
         <CommandPalette
           isOpen={isCommandPaletteOpen}
           onClose={() => setIsCommandPaletteOpen(false)}
-          onSwitchRole={handleQuickSwitchRole}
         />
 
         {/* Minimal Quiet Desktop Sidebar */}
@@ -253,32 +225,6 @@ export default function DashboardClientShell({ children }: { children: React.Rea
                 );
               })}
             </nav>
-
-            {/* RBAC Persona Switcher (Demux Helper) */}
-            <div className="border-t border-border p-3 bg-surface-sunk/40">
-              <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-text-muted mb-1.5 px-1">
-                <span>Switch Role</span>
-                {isSwitchingRole && <RefreshCw className="h-3 w-3 animate-spin text-accent" />}
-              </div>
-              <select
-                value={user?.role || ''}
-                onChange={(e) => {
-                  const persona = DEMO_PERSONAS.find((p) => p.role === e.target.value);
-                  if (persona) {
-                    handleQuickSwitchRole(persona.phone, persona.pin, persona.defaultPath);
-                  }
-                }}
-                disabled={isSwitchingRole}
-                aria-label="Switch Role (RBAC Demo)"
-                className="w-full text-xs bg-surface border border-border rounded-md py-1.5 px-2.5 text-text font-medium focus:outline-none focus:border-accent cursor-pointer disabled:opacity-50"
-              >
-                {DEMO_PERSONAS.map((p) => (
-                  <option key={p.role} value={p.role}>
-                    {p.label} ({p.name.split(' ')[0]})
-                  </option>
-                ))}
-              </select>
-            </div>
 
             {/* User Session Footer */}
             <div className="border-t border-border p-3 bg-surface">

@@ -121,35 +121,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             );
           })}
 
-          {onSwitchRole && (
-            <>
-              <div className="px-3 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-muted border-t border-border mt-2">
-                Quick Role Impersonation
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  onSwitchRole('9800000001', '1234', '/brief');
-                  onClose();
-                }}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface-sunk text-xs text-text transition-colors text-left"
-              >
-                <span>Switch to Company Owner</span>
-                <span className="text-[10px] text-text-faint font-mono">OWNER</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onSwitchRole('9811122233', '9999', '/dpr');
-                  onClose();
-                }}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface-sunk text-xs text-text transition-colors text-left"
-              >
-                <span>Switch to Project Manager</span>
-                <span className="text-[10px] text-text-faint font-mono">PM</span>
-              </button>
-            </>
-          )}
+
 
           <div className="px-3 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-muted border-t border-border mt-2">
             System & Privacy

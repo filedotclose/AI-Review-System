@@ -39,63 +39,7 @@ interface ExpenseItem {
   created_at?: string;
 }
 
-const INITIAL_EXPENSES: ExpenseItem[] = [
-  {
-    id: 1,
-    amount: 3200,
-    category: 'DIESEL',
-    description: 'Emergency diesel for generator standby (35 liters)',
-    date: new Date().toISOString().split('T')[0],
-    is_out_of_pocket: false,
-    approval_status: 'APPROVED',
-    reimbursement_status: 'NOT_APPLICABLE',
-    has_physical_bill: true,
-  },
-  {
-    id: 2,
-    amount: 1450,
-    category: 'SPARES',
-    description: 'Bauer rig hydraulic seals and replacement O-rings',
-    date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-    is_out_of_pocket: true,
-    approval_status: 'PENDING',
-    reimbursement_status: 'DUE',
-    has_physical_bill: true,
-  },
-  {
-    id: 3,
-    amount: 850,
-    category: 'FOOD_WATER',
-    description: 'Night shift refreshment & drinking water cans for piling crew',
-    date: new Date(Date.now() - 172800000).toISOString().split('T')[0],
-    is_out_of_pocket: false,
-    approval_status: 'APPROVED',
-    reimbursement_status: 'NOT_APPLICABLE',
-    has_physical_bill: false,
-  },
-  {
-    id: 4,
-    amount: 600,
-    category: 'TRANSPORT',
-    description: 'Auto-rickshaw courier charges for soil sample lab testing',
-    date: new Date(Date.now() - 259200000).toISOString().split('T')[0],
-    is_out_of_pocket: true,
-    approval_status: 'APPROVED',
-    reimbursement_status: 'DUE',
-    has_physical_bill: true,
-  },
-  {
-    id: 5,
-    amount: 2200,
-    category: 'TOOLS',
-    description: 'Gas cutting nozzles & grinding discs for cage welding',
-    date: new Date(Date.now() - 345600000).toISOString().split('T')[0],
-    is_out_of_pocket: true,
-    approval_status: 'PENDING',
-    reimbursement_status: 'DUE',
-    has_physical_bill: true,
-  },
-];
+const INITIAL_EXPENSES: ExpenseItem[] = [];
 
 const generateOfflineTxId = (): string => 'offline-' + Date.now();
 
@@ -173,10 +117,36 @@ export default function PettyCashPage() {
     }
   }, [siteId]);
 
+  // Fetch live expenses from backend
+  const fetchExpenses = useCallback(async () => {
+    try {
+      const res = await apiClient.get(`/petty-cash/expenses?site_id=${siteId}`);
+      if (Array.isArray(res.data)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const liveItems: ExpenseItem[] = res.data.map((tx: any) => ({
+          id: tx.id,
+          amount: tx.amount,
+          category: tx.category,
+          description: tx.description,
+          date: typeof tx.date === 'string' ? tx.date : new Date(tx.date).toISOString().split('T')[0],
+          is_out_of_pocket: tx.is_out_of_pocket,
+          approval_status: tx.approval_status,
+          reimbursement_status: tx.reimbursement_status,
+          has_physical_bill: tx.has_physical_bill,
+          receipt_photo_url: tx.receipt_photo_url,
+          created_at: tx.created_at,
+        }));
+        setExpenses(liveItems);
+      }
+    } catch {
+      // Backend may not be reachable in pure offline mode
+    }
+  }, [siteId]);
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchWallet();
-  }, [fetchWallet]);
+    fetchExpenses();
+  }, [fetchWallet, fetchExpenses]);
 
   // Duplicate check logic
   const duplicateWarning = useMemo(() => {
@@ -763,7 +733,14 @@ export default function PettyCashPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredExpenses.map((exp) => (
+                {filteredExpenses.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center" className="py-8 text-xs text-text-muted">
+                      No petty cash vouchers recorded yet for this site.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredExpenses.map((exp) => (
                   <TableRow key={exp.id}>
                     <TableCell isNumeric>#{exp.id}</TableCell>
                     <TableCell className="font-mono text-xs">{exp.date}</TableCell>
@@ -813,8 +790,9 @@ export default function PettyCashPage() {
                         )}
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
+                ))
+              )}
+            </TableBody>
             </Table>
           </CardContent>
         </Card>

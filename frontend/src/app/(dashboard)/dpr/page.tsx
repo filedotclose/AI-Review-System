@@ -24,75 +24,72 @@ import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table';
 import { TwoPaneReviewWorkspace, ReviewDPRData } from '@/components/review/TwoPaneReviewWorkspace';
 
-const INITIAL_DPR_QUEUE: ReviewDPRData[] = [
-  {
-    id: 101,
-    site_id: 1,
-    site_name: 'Vadakara AVRP Flyover Package',
-    operational_date: new Date().toISOString().split('T')[0],
-    shift: 'DAY',
-    submitter_name: 'Rajesh Sharma (Site Engineer)',
-    status: 'SUBMITTED',
+const INITIAL_DPR_QUEUE: ReviewDPRData[] = [];
+
+// Helper to map backend DPR responses to the review workspace data structure
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mapApiDprToReviewData = (d: any): ReviewDPRData => {
+  const pile = d.pile_progress?.[0];
+  const eq = d.equipment_logs?.[0];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const totalLabour = d.labour_summaries?.reduce((acc: number, l: any) => acc + (l.count || 0), 0) || 0;
+
+  const plannedConcrete = pile?.concrete_volume_planned_m3 || 0;
+  const actualConcrete = pile?.concrete_volume_actual_m3 || 0;
+  const overbreak = plannedConcrete > 0
+    ? Math.round(((actualConcrete - plannedConcrete) / plannedConcrete) * 1000) / 10
+    : 0;
+
+  return {
+    id: d.id,
+    site_id: d.site_id,
+    site_name: d.site_name || 'Vadakara AVRP Flyover Package',
+    operational_date: typeof d.operational_date === 'string' ? d.operational_date : new Date(d.operational_date).toISOString().split('T')[0],
+    shift: d.shift || 'DAY',
+    submitter_name: d.submitted_by_name || `Site Engineer #${d.submitted_by || 1}`,
+    status: d.status || 'SUBMITTED',
     piling_summary: {
-      pile_number: 'P-104 (Pier P12)',
-      diameter_mm: 1000,
-      depth_drilled_m: 18.5,
-      rock_socket_m: 3.2,
-      strata: 'WEATHERED_ROCK',
-      planned_concrete_m3: 14.5,
-      actual_concrete_m3: 15.8,
-      overbreak_pct: 8.9,
+      pile_number: pile?.pile_number || (pile?.pile_id ? `Pile #${pile.pile_id}` : 'P-101 (Pier P12)'),
+      diameter_mm: pile?.diameter_mm || 1000,
+      depth_drilled_m: pile?.depth_drilled_today_m || 0,
+      rock_socket_m: pile?.rock_socket_depth_today_m || 0,
+      strata: pile?.strata_type || 'WEATHERED_ROCK',
+      planned_concrete_m3: plannedConcrete,
+      actual_concrete_m3: actualConcrete,
+      overbreak_pct: overbreak,
     },
     equipment_summary: {
-      name: 'Bauer BG-28 Rotary Rig #1',
-      hours_run: 8.5,
-      breakdown_hours: 1.5,
-      breakdown_reason: 'Hydraulic pressure hose leak - replaced O-ring',
+      name: eq?.name || 'Bauer BG-28 Rotary Rig #1',
+      hours_run: eq?.working_hours || eq?.hours_run || 0,
+      breakdown_hours: eq?.breakdown_hours || 0,
+      breakdown_reason: eq?.breakdown_reason,
     },
-    manpower_total: 23,
-    delays: 'Concrete transit mixer stuck in Vadakara bypass traffic (1.0h)',
-  },
-  {
-    id: 100,
-    site_id: 1,
-    site_name: 'Vadakara AVRP Flyover Package',
-    operational_date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-    shift: 'NIGHT',
-    submitter_name: 'Amit Patel (Site Engineer)',
-    status: 'VERIFIED',
-    piling_summary: {
-      pile_number: 'P-103 (Pier P11)',
-      diameter_mm: 1000,
-      depth_drilled_m: 22.0,
-      rock_socket_m: 4.1,
-      strata: 'HARD_ROCK',
-      planned_concrete_m3: 17.2,
-      actual_concrete_m3: 18.0,
-      overbreak_pct: 4.6,
-    },
-    equipment_summary: {
-      name: 'Bauer BG-28 Rotary Rig #1',
-      hours_run: 10.0,
-      breakdown_hours: 0,
-    },
-    manpower_total: 19,
-    verified_at: '2026-09-22 09:30 AM by Vikram Mehta (PM)',
-  },
-];
+    manpower_total: totalLabour,
+    delays: d.problems_delays || '',
+    verified_at: d.verified_at ? `${d.verified_at}` : undefined,
+  };
+};
 
 export default function DPRPage() {
   const { user } = useAuth();
+  const isSiteEngineer = user?.role === 'SITE_ENGINEER';
   const isPMOrOwner = user?.role === 'PROJECT_MANAGER' || user?.role === 'OWNER';
+
+  const getDefaultTab = (role?: string): 'verification' | 'entry' | 'history' => {
+    if (role === 'SITE_ENGINEER') return 'entry';
+    if (role === 'PROJECT_MANAGER' || role === 'OWNER') return 'verification';
+    return 'history';
+  };
 
   // Role Tab State
   const [prevRole, setPrevRole] = useState(user?.role);
-  const [activeTab, setActiveTab] = useState<'verification' | 'entry' | 'history'>(
-    user?.role === 'PROJECT_MANAGER' ? 'verification' : 'entry'
+  const [activeTab, setActiveTab] = useState<'verification' | 'entry' | 'history'>(() =>
+    getDefaultTab(user?.role)
   );
 
   if (user?.role !== prevRole) {
     setPrevRole(user?.role);
-    setActiveTab(user?.role === 'PROJECT_MANAGER' ? 'verification' : 'entry');
+    setActiveTab(getDefaultTab(user?.role));
   }
 
   // Active Two-Pane Review State (Section 7)
@@ -101,6 +98,26 @@ export default function DPRPage() {
   // Verification Queue State
   const [dprQueue, setDprQueue] = useState<ReviewDPRData[]>(INITIAL_DPR_QUEUE);
 
+  // Fetch live DPRs from API
+  useEffect(() => {
+    let isMounted = true;
+    async function loadDprs() {
+      try {
+        const res = await apiClient.get('/dpr');
+        if (isMounted && Array.isArray(res.data)) {
+          const mapped = res.data.map(mapApiDprToReviewData);
+          setDprQueue(mapped);
+        }
+      } catch (err) {
+        console.warn('Could not load DPR records from API:', err);
+      }
+    }
+    loadDprs();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // General Shift State
   const [siteId, setSiteId] = useState('1');
   const [operationalDate, setOperationalDate] = useState(() => {
@@ -108,7 +125,7 @@ export default function DPRPage() {
   });
   const [shift, setShift] = useState<'DAY' | 'NIGHT'>('DAY');
   const [weather, setWeather] = useState('SUNNY');
-  const submitterName = 'Rajesh Sharma (Site Engineer)';
+  const submitterName = user?.name ? `${user.name} (Site Engineer)` : 'Site Engineer';
 
   // Piling Progress State
   const pileId = '1';
@@ -407,7 +424,9 @@ export default function DPRPage() {
           <p className="text-xs text-text-muted mt-1 leading-relaxed">
             {isPMOrOwner
               ? 'Human-in-the-Loop Review Center: Verify pile boring telemetry, check concrete overbreak ratios, and validate rig downtime.'
-              : 'Site Engineer Workstation: Complete piling progress, equipment telematics, and delay documentation.'}
+              : isSiteEngineer
+              ? 'Site Engineer Workstation: Complete piling progress, equipment telematics, and delay documentation.'
+              : 'DPR Center: View historical daily progress reports and engineering logs.'}
           </p>
         </div>
 
@@ -445,18 +464,20 @@ export default function DPRPage() {
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('entry')}
-          className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-semibold transition-colors cursor-pointer ${
-            activeTab === 'entry'
-              ? 'border-accent text-accent'
-              : 'border-transparent text-text-muted hover:text-text'
-          }`}
-        >
-          <FileText className="h-4 w-4" />
-          <span>{isPMOrOwner ? 'Technical Entry Preview' : 'New DPR Entry'}</span>
-        </button>
+        {isSiteEngineer && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('entry')}
+            className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-semibold transition-colors cursor-pointer ${
+              activeTab === 'entry'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-text-muted hover:text-text'
+            }`}
+          >
+            <FileText className="h-4 w-4" />
+            <span>New DPR Entry</span>
+          </button>
+        )}
 
         <button
           type="button"
@@ -571,104 +592,114 @@ export default function DPRPage() {
             </span>
           </div>
 
-          <div className="space-y-4">
-            {dprQueue.map((item) => (
-              <Card
-                key={item.id}
-                padding="md"
-                isInteractive
-                onClick={() => setActiveReviewDpr(item)}
-                className={`transition-all duration-fast ${
-                  item.status === 'VERIFIED'
-                    ? 'border-status-success/30 bg-surface'
-                    : 'border-border bg-surface hover:border-accent/40 shadow-soft'
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-text text-sm">
-                        DPR #{item.id} — {item.piling_summary.pile_number}
-                      </span>
-                      <Badge variant="accent" size="sm">
-                        {item.shift} SHIFT
-                      </Badge>
-                      <Badge
-                        variant={
-                          item.status === 'VERIFIED'
-                            ? 'verified'
-                            : item.status === 'REJECTED'
-                            ? 'danger'
-                            : 'warning'
-                        }
-                        size="sm"
-                      >
-                        {item.status}
-                      </Badge>
+          {dprQueue.length === 0 ? (
+            <div className="bg-surface p-12 text-center rounded-lg border border-dashed border-border space-y-3">
+              <CheckCircle2 className="h-10 w-10 text-status-success mx-auto opacity-70" />
+              <div className="text-sm font-semibold text-text">No DPRs Awaiting Sign-off</div>
+              <p className="text-xs text-text-muted max-w-sm mx-auto">
+                All daily progress reports have been verified, or no fresh reports have been submitted yet.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {dprQueue.map((item) => (
+                <Card
+                  key={item.id}
+                  padding="md"
+                  isInteractive
+                  onClick={() => setActiveReviewDpr(item)}
+                  className={`transition-all duration-fast ${
+                    item.status === 'VERIFIED'
+                      ? 'border-status-success/30 bg-surface'
+                      : 'border-border bg-surface hover:border-accent/40 shadow-soft'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-text text-sm">
+                          DPR #{item.id} — {item.piling_summary.pile_number}
+                        </span>
+                        <Badge variant="accent" size="sm">
+                          {item.shift} SHIFT
+                        </Badge>
+                        <Badge
+                          variant={
+                            item.status === 'VERIFIED'
+                              ? 'verified'
+                              : item.status === 'REJECTED'
+                              ? 'danger'
+                              : 'warning'
+                          }
+                          size="sm"
+                        >
+                          {item.status}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-text-muted mt-0.5">
+                        {item.site_name} • Submitted by {item.submitter_name} on {item.operational_date}
+                      </div>
                     </div>
-                    <div className="text-xs text-text-muted mt-0.5">
-                      {item.site_name} • Submitted by {item.submitter_name} on {item.operational_date}
-                    </div>
+
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveReviewDpr(item);
+                      }}
+                      rightIcon={<ArrowRight className="h-3.5 w-3.5" />}
+                    >
+                      Open in Review Workspace
+                    </Button>
                   </div>
 
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveReviewDpr(item);
-                    }}
-                    rightIcon={<ArrowRight className="h-3.5 w-3.5" />}
-                  >
-                    Open in Review Workspace
-                  </Button>
-                </div>
-
-                {/* Technical Overview Row */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 text-xs">
-                  <div className="p-3 bg-surface-sunk/60 rounded-md">
-                    <span className="text-[10px] text-text-faint block uppercase tracking-wider">Boring Depth</span>
-                    <span className="font-semibold text-text font-mono">
-                      {item.piling_summary.depth_drilled_m}m drilled (Socket: {item.piling_summary.rock_socket_m}m)
-                    </span>
-                    <span className="block text-[11px] text-text-muted mt-0.5">
-                      Strata: {item.piling_summary.strata}
-                    </span>
-                  </div>
-
-                  <div className="p-3 bg-surface-sunk/60 rounded-md">
-                    <span className="text-[10px] text-text-faint block uppercase tracking-wider">Concrete Overbreak</span>
-                    <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="font-bold text-status-warning font-mono">
-                        +{item.piling_summary.overbreak_pct}%
+                  {/* Technical Overview Row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 text-xs">
+                    <div className="p-3 bg-surface-sunk/60 rounded-md">
+                      <span className="text-[10px] text-text-faint block uppercase tracking-wider">Boring Depth</span>
+                      <span className="font-semibold text-text font-mono">
+                        {item.piling_summary.depth_drilled_m}m drilled (Socket: {item.piling_summary.rock_socket_m}m)
                       </span>
-                      <span className="text-[10px] text-text-faint">
-                        ({item.piling_summary.actual_concrete_m3} / {item.piling_summary.planned_concrete_m3} m³)
+                      <span className="block text-[11px] text-text-muted mt-0.5">
+                        Strata: {item.piling_summary.strata}
                       </span>
                     </div>
-                    <span className="block text-[11px] text-text-muted mt-0.5">
-                      Tolerance threshold &lt;15%
-                    </span>
-                  </div>
 
-                  <div className="p-3 bg-surface-sunk/60 rounded-md">
-                    <span className="text-[10px] text-text-faint block uppercase tracking-wider">Rig Runtime</span>
-                    <span className="font-semibold text-text font-mono">
-                      {item.equipment_summary.hours_run} hrs (Downtime: {item.equipment_summary.breakdown_hours}h)
-                    </span>
-                    <span className="block text-[11px] text-text-muted truncate mt-0.5">
-                      {item.equipment_summary.name}
-                    </span>
+                    <div className="p-3 bg-surface-sunk/60 rounded-md">
+                      <span className="text-[10px] text-text-faint block uppercase tracking-wider">Concrete Overbreak</span>
+                      <div className="flex items-baseline gap-1 mt-0.5">
+                        <span className="font-bold text-status-warning font-mono">
+                          +{item.piling_summary.overbreak_pct}%
+                        </span>
+                        <span className="text-[10px] text-text-faint">
+                          ({item.piling_summary.actual_concrete_m3} / {item.piling_summary.planned_concrete_m3} m³)
+                        </span>
+                      </div>
+                      <span className="block text-[11px] text-text-muted mt-0.5">
+                        Tolerance threshold &lt;15%
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-surface-sunk/60 rounded-md">
+                      <span className="text-[10px] text-text-faint block uppercase tracking-wider">Rig Runtime</span>
+                      <span className="font-semibold text-text font-mono">
+                        {item.equipment_summary.hours_run} hrs (Downtime: {item.equipment_summary.breakdown_hours}h)
+                      </span>
+                      <span className="block text-[11px] text-text-muted truncate mt-0.5">
+                        {item.equipment_summary.name}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* TAB 2: Technical DPR Form (Site Engineer Workstation) */}
-      {(activeTab === 'entry' || !isPMOrOwner) && (
+      {/* TAB 2: Technical DPR Form (Site Engineer Workstation ONLY) */}
+      {isSiteEngineer && activeTab === 'entry' && (
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Section 1: Shift Header */}
           <Card padding="md">
@@ -945,65 +976,75 @@ export default function DPRPage() {
             <CardDescription>Immutable record of all daily engineering reports filed for this project package.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>DPR ID</TableHead>
-                  <TableHead>Date & Shift</TableHead>
-                  <TableHead>Pile Ref</TableHead>
-                  <TableHead>Drilled Depth</TableHead>
-                  <TableHead>Overbreak</TableHead>
-                  <TableHead>Rig Hours</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead align="right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dprQueue.map((item) => (
-                  <TableRow key={item.id} isClickable onClick={() => setActiveReviewDpr(item)}>
-                    <TableCell isNumeric>#{item.id}</TableCell>
-                    <TableCell>
-                      <span className="font-mono text-xs">{item.operational_date}</span>{' '}
-                      <span className="text-text-faint text-[11px]">({item.shift})</span>
-                    </TableCell>
-                    <TableCell>{item.piling_summary.pile_number}</TableCell>
-                    <TableCell isNumeric>{item.piling_summary.depth_drilled_m} m</TableCell>
-                    <TableCell isNumeric>
-                      <span className="font-semibold text-status-warning">
-                        +{item.piling_summary.overbreak_pct}%
-                      </span>
-                    </TableCell>
-                    <TableCell isNumeric>{item.equipment_summary.hours_run} hrs</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          item.status === 'VERIFIED'
-                            ? 'verified'
-                            : item.status === 'REJECTED'
-                            ? 'danger'
-                            : 'warning'
-                        }
-                        size="sm"
-                      >
-                        {item.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveReviewDpr(item);
-                        }}
-                      >
-                        Review
-                      </Button>
-                    </TableCell>
+            {dprQueue.length === 0 ? (
+              <div className="py-12 text-center text-text-muted space-y-2">
+                <FileText className="h-10 w-10 mx-auto opacity-40 text-text-muted" />
+                <p className="text-xs font-medium">No Historical DPRs Found</p>
+                <p className="text-[11px] text-text-faint">
+                  Fresh DPRs submitted by Site Engineers will be permanently archived and listed here.
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>DPR ID</TableHead>
+                    <TableHead>Date & Shift</TableHead>
+                    <TableHead>Pile Ref</TableHead>
+                    <TableHead>Drilled Depth</TableHead>
+                    <TableHead>Overbreak</TableHead>
+                    <TableHead>Rig Hours</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead align="right">Action</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {dprQueue.map((item) => (
+                    <TableRow key={item.id} isClickable onClick={() => setActiveReviewDpr(item)}>
+                      <TableCell isNumeric>#{item.id}</TableCell>
+                      <TableCell>
+                        <span className="font-mono text-xs">{item.operational_date}</span>{' '}
+                        <span className="text-text-faint text-[11px]">({item.shift})</span>
+                      </TableCell>
+                      <TableCell>{item.piling_summary.pile_number}</TableCell>
+                      <TableCell isNumeric>{item.piling_summary.depth_drilled_m} m</TableCell>
+                      <TableCell isNumeric>
+                        <span className="font-semibold text-status-warning">
+                          +{item.piling_summary.overbreak_pct}%
+                        </span>
+                      </TableCell>
+                      <TableCell isNumeric>{item.equipment_summary.hours_run} hrs</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            item.status === 'VERIFIED'
+                              ? 'verified'
+                              : item.status === 'REJECTED'
+                              ? 'danger'
+                              : 'warning'
+                          }
+                          size="sm"
+                        >
+                          {item.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveReviewDpr(item);
+                          }}
+                        >
+                          Review
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       )}
