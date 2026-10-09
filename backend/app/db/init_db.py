@@ -185,84 +185,13 @@ async def ensure_initial_data():
                 eq2 = Equipment(name="Sany SCC-500 Crawler Crane", registration_number="EQ-CRANE-01", type=EquipmentType.CRANE, site_id=site.id)
                 session.add_all([eq1, eq2])
 
-            # 3. Ensure Petty Cash Wallet and realistic persisted ledger exist
+            # 3. Ensure Petty Cash Wallet exists with clean starting balance (no fake transactions)
             wallet_stmt = select(PettyCashWallet).where(PettyCashWallet.site_id == site.id).limit(1)
             wallet = (await session.execute(wallet_stmt)).scalar_one_or_none()
             if not wallet:
-                wallet = PettyCashWallet(site_id=site.id, current_balance=14500.0)
+                wallet = PettyCashWallet(site_id=site.id, current_balance=25000.0)
                 session.add(wallet)
                 await session.flush()
-
-            tx_check_stmt = select(PettyCashTransaction).where(PettyCashTransaction.wallet_id == wallet.id).limit(1)
-            existing_tx = (await session.execute(tx_check_stmt)).scalar_one_or_none()
-            if not existing_tx:
-                sup_res = await session.execute(select(User).where(User.role == UserRole.SUPERVISOR).limit(1))
-                sup_user = sup_res.scalar_one_or_none()
-                rec_by_id = sup_user.id if sup_user else 1
-
-                initial_txs = [
-                    PettyCashTransaction(
-                        wallet_id=wallet.id,
-                        project_id=proj.id,
-                        type=TransactionType.EXPENSE,
-                        amount=5200.0,
-                        category=ExpenseCategory.DIESEL,
-                        description="Emergency diesel for Bauer BG-28 generator during night shift pour",
-                        has_physical_bill=True,
-                        is_out_of_pocket=False,
-                        approval_status=ApprovalStatus.APPROVED,
-                        reimbursement_status=ReimbursementStatus.NOT_APPLICABLE,
-                        recorded_by=rec_by_id,
-                        date=datetime.now(timezone.utc).date(),
-                        created_at=datetime.now(timezone.utc),
-                    ),
-                    PettyCashTransaction(
-                        wallet_id=wallet.id,
-                        project_id=proj.id,
-                        type=TransactionType.EXPENSE,
-                        amount=1450.0,
-                        category=ExpenseCategory.SPARES,
-                        description="Bauer rig hydraulic seals and replacement O-rings",
-                        has_physical_bill=True,
-                        is_out_of_pocket=True,
-                        approval_status=ApprovalStatus.PENDING,
-                        reimbursement_status=ReimbursementStatus.DUE,
-                        recorded_by=rec_by_id,
-                        date=datetime.now(timezone.utc).date(),
-                        created_at=datetime.now(timezone.utc),
-                    ),
-                    PettyCashTransaction(
-                        wallet_id=wallet.id,
-                        project_id=proj.id,
-                        type=TransactionType.EXPENSE,
-                        amount=850.0,
-                        category=ExpenseCategory.FOOD_WATER,
-                        description="Night shift refreshment & drinking water cans for piling crew",
-                        has_physical_bill=False,
-                        is_out_of_pocket=False,
-                        approval_status=ApprovalStatus.APPROVED,
-                        reimbursement_status=ReimbursementStatus.NOT_APPLICABLE,
-                        recorded_by=rec_by_id,
-                        date=datetime.now(timezone.utc).date(),
-                        created_at=datetime.now(timezone.utc),
-                    ),
-                    PettyCashTransaction(
-                        wallet_id=wallet.id,
-                        project_id=proj.id,
-                        type=TransactionType.EXPENSE,
-                        amount=600.0,
-                        category=ExpenseCategory.TRANSPORT,
-                        description="Auto-rickshaw courier charges for soil sample lab testing",
-                        has_physical_bill=True,
-                        is_out_of_pocket=True,
-                        approval_status=ApprovalStatus.APPROVED,
-                        reimbursement_status=ReimbursementStatus.DUE,
-                        recorded_by=rec_by_id,
-                        date=datetime.now(timezone.utc).date(),
-                        created_at=datetime.now(timezone.utc),
-                    ),
-                ]
-                session.add_all(initial_txs)
 
             # 4. Ensure standard Workers exist for Attendance check-in
             worker_count_stmt = select(Worker).where(Worker.assigned_site_id == site.id).limit(1)
