@@ -501,7 +501,12 @@ async def verify_dpr(
     id: int,
     verify_req: Optional[DPRVerifyRequest] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles([UserRole.PROJECT_MANAGER, UserRole.OWNER])),
+    current_user: User = Depends(require_roles([
+        UserRole.PROJECT_MANAGER,
+        UserRole.OWNER,
+        UserRole.SUPERVISOR,
+        UserRole.FINANCE_HEAD,
+    ])),
 ):
     """
     Verify DPR: updates verification status, verified_by, and verified_at timestamp.

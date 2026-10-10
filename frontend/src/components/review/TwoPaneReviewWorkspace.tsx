@@ -64,6 +64,7 @@ interface TwoPaneReviewWorkspaceProps {
   onReject: (id: number) => void;
   onFlag: (id: number, reason: string) => void;
   onBackToList?: () => void;
+  canApprove?: boolean;
 }
 
 export const TwoPaneReviewWorkspace: React.FC<TwoPaneReviewWorkspaceProps> = ({
@@ -72,6 +73,7 @@ export const TwoPaneReviewWorkspace: React.FC<TwoPaneReviewWorkspaceProps> = ({
   onReject,
   onFlag,
   onBackToList,
+  canApprove = true,
 }) => {
   const [activeHighlight, setActiveHighlight] = useState<string | null>(null);
   const [isReasoningExpanded, setIsReasoningExpanded] = useState(false);
@@ -138,7 +140,7 @@ export const TwoPaneReviewWorkspace: React.FC<TwoPaneReviewWorkspaceProps> = ({
         return;
       }
 
-      if (e.key === 'a' || e.key === 'A') {
+      if ((e.key === 'a' || e.key === 'A') && canApprove) {
         e.preventDefault();
         onApprove(dpr.id);
       } else if (e.key === 'r' || e.key === 'R') {
@@ -156,7 +158,7 @@ export const TwoPaneReviewWorkspace: React.FC<TwoPaneReviewWorkspaceProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dpr.id, onApprove, onReject, onFlag]);
+  }, [dpr.id, onApprove, onReject, onFlag, canApprove]);
 
   const handleSelectFinding = (finding: ReviewFinding) => {
     setActiveHighlight(finding.sourceKey);
@@ -614,18 +616,19 @@ export const TwoPaneReviewWorkspace: React.FC<TwoPaneReviewWorkspaceProps> = ({
         <div className="flex items-center gap-3">
           <div className="hidden sm:block text-right">
             <span className="text-[11px] text-text-faint block">
-              Human In The Loop Sign-off
+              {canApprove ? 'Human In The Loop Sign-off' : 'Site Engineer Submission (Read Only)'}
             </span>
           </div>
 
           <Button
-            variant="primary"
+            variant={canApprove ? "primary" : "ghost"}
             size="md"
-            onClick={() => onApprove(dpr.id)}
+            onClick={() => canApprove && onApprove(dpr.id)}
+            disabled={!canApprove}
             leftIcon={<Check className="h-4 w-4" />}
           >
-            <span>Approve & Verify DPR</span>
-            <kbd className="ml-1.5 text-[10px] font-mono opacity-80">A</kbd>
+            <span>{canApprove ? 'Approve & Verify DPR' : 'Awaiting Reviewer Sign-off'}</span>
+            {canApprove && <kbd className="ml-1.5 text-[10px] font-mono opacity-80">A</kbd>}
           </Button>
         </div>
       </div>

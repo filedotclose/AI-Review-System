@@ -114,23 +114,35 @@ async def test_dpr_verify_rbac_restrictions(
     rbac_users: Dict[str, User],
 ):
     """
-    Only PROJECT_MANAGER and OWNER can verify DPRs.
-    SITE_ENGINEER and SUPERVISOR must receive HTTP 403 Forbidden.
+    DPRs are uploaded by SITE_ENGINEER and verified/approved by other roles
+    (PROJECT_MANAGER, OWNER, SUPERVISOR, FINANCE_HEAD).
+    SITE_ENGINEER must receive HTTP 403 Forbidden.
     """
-    # 1. Site Engineer attempts to verify own DPR -> 403
+    # 1. Site Engineer attempts to verify DPR -> 403 Forbidden
     se_headers = get_headers_for_user(rbac_users["SITE_ENGINEER"])
     resp = await client.post(f"/api/v1/dpr/{sample_dpr.id}/verify", headers=se_headers)
     assert resp.status_code == 403, f"Expected 403 for Site Engineer, got {resp.status_code}: {resp.text}"
 
-    # 2. Supervisor attempts to verify DPR -> 403
+    # 2. Supervisor verifies DPR -> 200 OK
     sup_headers = get_headers_for_user(rbac_users["SUPERVISOR"])
     resp = await client.post(f"/api/v1/dpr/{sample_dpr.id}/verify", headers=sup_headers)
-    assert resp.status_code == 403, f"Expected 403 for Supervisor, got {resp.status_code}: {resp.text}"
+    assert resp.status_code == 200, f"Expected 200 for Supervisor, got {resp.status_code}: {resp.text}"
+    assert resp.json()["status"] == "VERIFIED"
 
-    # 3. Project Manager verifies DPR -> 200 OK
+    # 3. Finance Head verifies DPR -> 200 OK
+    fin_headers = get_headers_for_user(rbac_users["FINANCE_HEAD"])
+    resp = await client.post(f"/api/v1/dpr/{sample_dpr.id}/verify", headers=fin_headers)
+    assert resp.status_code == 200, f"Expected 200 for Finance Head, got {resp.status_code}: {resp.text}"
+
+    # 4. Project Manager verifies DPR -> 200 OK
     pm_headers = get_headers_for_user(rbac_users["PROJECT_MANAGER"])
     resp = await client.post(f"/api/v1/dpr/{sample_dpr.id}/verify", headers=pm_headers)
-    assert resp.status_code == 200
+    assert resp.status_code == 200, f"Expected 200 for Project Manager, got {resp.status_code}: {resp.text}"
+
+    # 5. Owner verifies DPR -> 200 OK
+    owner_headers = get_headers_for_user(rbac_users["OWNER"])
+    resp = await client.post(f"/api/v1/dpr/{sample_dpr.id}/verify", headers=owner_headers)
+    assert resp.status_code == 200, f"Expected 200 for Owner, got {resp.status_code}: {resp.text}"
     assert resp.json()["status"] == "VERIFIED"
 
 

@@ -73,12 +73,11 @@ const mapApiDprToReviewData = (d: any): ReviewDPRData => {
 export default function DPRPage() {
   const { user } = useAuth();
   const isSiteEngineer = user?.role === 'SITE_ENGINEER';
-  const isPMOrOwner = user?.role === 'PROJECT_MANAGER' || user?.role === 'OWNER';
+  const isApproverRole = Boolean(user?.role && user.role !== 'SITE_ENGINEER');
 
   const getDefaultTab = (role?: string): 'verification' | 'entry' | 'history' => {
     if (role === 'SITE_ENGINEER') return 'entry';
-    if (role === 'PROJECT_MANAGER' || role === 'OWNER') return 'verification';
-    return 'history';
+    return 'verification';
   };
 
   // Role Tab State
@@ -217,7 +216,7 @@ export default function DPRPage() {
       setDprQueue((prev) =>
         prev.map((d) =>
           d.id === dprId
-            ? { ...d, status: 'VERIFIED', verified_at: `Signed off by ${user?.name || 'Project Manager'}` }
+            ? { ...d, status: 'VERIFIED', verified_at: `Signed off by ${user?.name || user?.role?.replace('_', ' ') || 'Approver'}` }
             : d
         )
       );
@@ -404,6 +403,7 @@ export default function DPRPage() {
         onReject={handleRejectDpr}
         onFlag={handleFlagDpr}
         onBackToList={() => setActiveReviewDpr(null)}
+        canApprove={isApproverRole}
       />
     );
   }
@@ -422,7 +422,7 @@ export default function DPRPage() {
             </Badge>
           </div>
           <p className="text-xs text-text-muted mt-1 leading-relaxed">
-            {isPMOrOwner
+            {isApproverRole
               ? 'Human-in-the-Loop Review Center: Verify pile boring telemetry, check concrete overbreak ratios, and validate rig downtime.'
               : isSiteEngineer
               ? 'Site Engineer Workstation: Complete piling progress, equipment telematics, and delay documentation.'
@@ -430,7 +430,7 @@ export default function DPRPage() {
           </p>
         </div>
 
-        {isPMOrOwner && pendingVerificationCount > 0 && (
+        {isApproverRole && pendingVerificationCount > 0 && (
           <Button
             variant="primary"
             size="md"
@@ -444,7 +444,7 @@ export default function DPRPage() {
 
       {/* Navigation Tabs */}
       <div className="flex border-b border-border bg-surface px-4 rounded-t-lg">
-        {isPMOrOwner && (
+        {isApproverRole && (
           <button
             type="button"
             onClick={() => setActiveTab('verification')}
@@ -524,8 +524,8 @@ export default function DPRPage() {
         </div>
       )}
 
-      {/* TAB 1: PM Verification Queue (For Project Manager & Owner) */}
-      {isPMOrOwner && activeTab === 'verification' && (
+      {/* TAB 1: Verification Queue (For Project Manager, Owner, Supervisor, Finance Head) */}
+      {isApproverRole && activeTab === 'verification' && (
         <div className="space-y-5">
           {/* Executive Queue KPI Summary Strip */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
@@ -537,7 +537,7 @@ export default function DPRPage() {
                 {pendingVerificationCount} <span className="text-xs font-sans font-normal text-text-muted">DPR</span>
               </div>
               <span className="text-[11px] text-text-faint block">
-                Assigned to PM
+                Assigned for Verification
               </span>
             </div>
 
